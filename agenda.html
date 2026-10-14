@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sillion | Agenda de Serviço</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+</head>
+<body style="visibility:hidden">
+<header class="top">
+  <img src="assets/logo-escuro.png" alt="Sillion">
+  <div><span>Agenda de serviço</span><button class="btn ghost" id="sair">Sair</button></div>
+</header>
+
+<div class="alerta" id="alerta" role="alert" hidden>
+  <span id="alertaTxt"></span>
+  <button type="button" id="alertaFechar" title="Fechar aviso" aria-label="Fechar aviso">×</button>
+</div>
+
+<div class="wrap">
+  <section class="panel">
+    <h2 id="tituloForm">Novo agendamento</h2>
+    <form id="form">
+      <div class="field"><label>Serviço</label>
+        <select name="servico" required>
+          <option>Instalação</option><option>Desinstalação</option><option>Manutenção</option>
+        </select></div>
+      <div class="field"><label>Descrição (opcional)</label><input name="descricao" placeholder="Ex.: telemetria apagada"></div>
+      <div class="row2">
+        <div class="field"><label>Placa</label><input name="placa" required maxlength="8" style="text-transform:uppercase"></div>
+        <div class="field"><label>Tag</label><input name="tag"></div>
+      </div>
+      <div class="field"><label>Tipo de veículo</label><input name="veiculo" placeholder="Ônibus, Hilux, Caminhão..." required></div>
+      <div class="field"><label>Empresa</label><input name="empresa" required></div>
+      <div class="row2">
+        <div class="field"><label>Data</label><input type="date" name="data" required></div>
+        <div class="field"><label>Horário</label>
+          <select name="horario"></select></div>
+      </div>
+      <div class="field"><label>Local</label>
+        <select name="local"><option>Atendimento C.I</option><option>Salobo</option></select></div>
+      <div class="field">
+        <div class="field-head"><label>Endereço do atendimento</label><button type="button" class="mini" id="btnEndereco">Usar endereço Sillion</button></div>
+        <input name="endereco" required>
+      </div>
+      <div class="field"><label>Procurar por</label>
+        <select name="contato" required><option>GERSON SANTOS</option><option>EVANDRO BRAGA</option></select></div>
+      <div class="field"><label>Status</label>
+        <select name="status"><option>Agendado</option></select></div>
+      <div class="field"><label>Alta</label>
+        <select name="alta"><option>ALTA ABERTA</option><option>SEM ALTA</option></select></div>
+      <button class="btn full" type="submit" id="btnSalvar">Agendar</button>
+      <button type="button" class="btn ghost full" id="btnCancelarEdicao" style="display:none;margin-top:8px">Cancelar edição</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Agenda</h2>
+    <div class="tabs" id="tabs">
+      <button data-v="dia" class="on">Dia</button>
+      <button data-v="semana">Semana</button>
+      <button data-v="mes">Mês</button>
+      <button data-v="todos">Todos</button>
+    </div>
+    <div class="bar">
+      <div class="field"><label>Data de referência</label><input type="date" id="filtro"></div>
+      <div class="field campo-placa"><label>Filtrar placa</label><input id="filtroPlaca" placeholder="Ex.: ABC1D23" style="text-transform:uppercase"></div>
+      <button class="btn" id="pdfTec">PDF do técnico</button>
+    </div>
+    <p class="resumo" id="resumo"></p>
+    <div id="lista"></div>
+  </section>
+</div>
+<footer class="os-foot">OS 061</footer>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="js/logo-data.js"></script>
+<script src="js/horarios.js"></script>
+<script src="js/pdf.js"></script>
+<script type="module" src="js/agenda.js"></script>
+</body>
+</html>

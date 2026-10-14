@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sillion | Agendamento de Serviços</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+</head>
+<body>
+<main class="login">
+  <div class="arc"></div>
+  <form class="card" id="loginForm">
+    <img src="assets/logo-claro.png" alt="Sillion">
+    <div class="os-badge">OS 061</div>
+    <h1>Agenda de serviço</h1>
+    <div class="field"><label for="user">E-mail</label><input id="user" type="email" autocomplete="username" required></div>
+    <div class="field"><label for="pass">Senha</label><input id="pass" type="password" autocomplete="current-password" required></div>
+    <p class="err" id="err"></p>
+    <button class="btn full" type="submit">Entrar</button>
+  </form>
+</main>
+<script type="module" src="js/auth.js"></script>
+</body>
+</html>

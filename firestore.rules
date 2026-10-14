@@ -1,0 +1,34 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function valido() {
+      let d = request.resource.data;
+      return d.servico in ['Instalação', 'Desinstalação', 'Manutenção']
+        && d.placa is string && d.placa.size() > 0 && d.placa.size() <= 8
+        && d.data is string && d.data.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        // serviços de 2h. Atendimento C.I: 08-12h e 13-17h. Salobo: 08-12h e 13-15h (técnico pega o ônibus às 15h)
+        && d.horario in ['08:00', '09:00', '10:00', '13:00', '14:00', '15:00']
+        && (d.local != 'Salobo' || d.horario in ['08:00', '09:00', '10:00', '13:00'])
+        && d.local in ['Atendimento C.I', 'Salobo']
+        && d.contato in ['GERSON SANTOS', 'EVANDRO BRAGA']
+        && d.status in ['Agendado', 'Confirmado', 'Concluído', 'Cancelado']
+        && d.veiculo is string && d.veiculo.size() > 0 && d.veiculo.size() <= 60
+        && d.empresa is string && d.empresa.size() > 0 && d.empresa.size() <= 100
+        && d.endereco is string && d.endereco.size() <= 250
+        && (!('alta' in d) || d.alta in ['ALTA ABERTA', 'SEM ALTA'])
+        && (!('tag' in d) || (d.tag is string && d.tag.size() <= 40))
+        && (!('descricao' in d) || (d.descricao is string && d.descricao.size() <= 300));
+    }
+
+    match /agendamentos/{id} {
+      allow read, delete: if request.auth != null;
+      allow create, update: if request.auth != null && valido();
+    }
+
+    // tudo o mais fica bloqueado
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
