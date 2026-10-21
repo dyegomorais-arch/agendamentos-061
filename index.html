@@ -6,7 +6,7 @@
 <title>061 | Agendamento de Serviços</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=4">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 </head>
@@ -18,11 +18,42 @@
     <div class="os-badge">OS 061</div>
     <h1>Agenda de serviço</h1>
     <div class="field"><label for="user">E-mail</label><input id="user" type="email" autocomplete="username" required></div>
-    <div class="field"><label for="pass">Senha</label><input id="pass" type="password" autocomplete="current-password" required></div>
+    <div class="field"><label for="pass">Senha</label>
+      <div class="pass-wrap">
+        <input id="pass" type="password" autocomplete="current-password" required>
+        <button type="button" class="eye" id="verSenha" style="display:flex;align-items:center;justify-content:center" aria-label="Mostrar senha" title="Mostrar senha">
+          <svg class="i-olho" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="i-riscado" style="display:none" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a19.8 19.8 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 4c7 0 11 8 11 8a19.8 19.8 0 0 1-3.17 4.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
+    </div>
     <p class="err" id="err"></p>
     <button class="btn full" type="submit">Entrar</button>
   </form>
+
+  <aside class="novidade" role="note">
+    <div class="nov-data"><small>NOV</small><strong>02</strong></div>
+    <div class="nov-txt">
+      <b>Uma cara nova vem aí!</b>
+      <span>No dia <em>02/11</em> o sistema terá um visual totalmente novo.</span>
+    </div>
+  </aside>
 </main>
-<script type="module" src="js/auth.js"></script>
+<script>
+(function(){
+  var campo=document.getElementById('pass'), btn=document.getElementById('verSenha');
+  btn.addEventListener('click',function(){
+    var mostrar=campo.type==='password';
+    campo.type=mostrar?'text':'password';
+    btn.classList.toggle('on',mostrar);
+    btn.querySelector('.i-olho').style.display=mostrar?'none':'block';
+    btn.querySelector('.i-riscado').style.display=mostrar?'block':'none';
+    var t=mostrar?'Ocultar senha':'Mostrar senha';
+    btn.setAttribute('aria-label',t); btn.title=t;
+    campo.focus();
+  });
+})();
+</script>
+<script type="module" src="js/auth.js?v=4"></script>
 </body>
 </html>

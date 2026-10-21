@@ -103,3 +103,39 @@ tr.conflito td{background:#fff1f2}
 .os-foot{text-align:center;color:var(--gray);font-size:.75rem;font-weight:600;letter-spacing:.18em;padding:6px 0 26px}
 
 .quem{white-space:normal;min-width:170px}.quem span{display:block;font-weight:600}.quem small{display:block;color:#6d7076;font-size:.7rem;margin-top:2px}
+
+/* ---------- LOGIN: OLHINHO DA SENHA (dentro do campo, à direita) ---------- */
+.pass-wrap{position:relative}
+.pass-wrap input{padding-right:46px}
+.eye{position:absolute;top:0;right:0;height:100%;width:44px;border:0;background:none;color:var(--gray);cursor:pointer;border-radius:0 10px 10px 0;transition:color .2s}
+.eye:hover,.eye.on{color:var(--red)}
+
+/* ---------- LOGIN: AVISO DE NOVIDADE (fora do card) ---------- */
+.login{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+.novidade{position:relative;width:100%;max-width:340px;display:flex;align-items:center;gap:16px;padding:12px 16px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;box-shadow:0 14px 40px rgba(0,0,0,.35);animation:rise .8s 1.5s both cubic-bezier(.2,.8,.2,1)}
+.nov-data{flex:0 0 auto;width:58px;height:62px;border-radius:12px;background:#fff;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;border-top:7px solid var(--red);box-shadow:0 6px 16px rgba(0,0,0,.3);animation:pulso 2.6s ease-in-out 2.5s infinite}
+.nov-data small{font-size:.62rem;font-weight:700;letter-spacing:.18em;color:var(--red);margin-top:1px}
+.nov-data strong{font-size:1.65rem;line-height:1;font-weight:700}
+.nov-txt{display:flex;flex-direction:column;gap:3px;line-height:1.35}
+.nov-txt b{font-size:1.02rem;font-weight:700}
+.nov-txt span{font-size:.84rem;color:#d4d6db}
+.nov-txt em{font-style:normal;font-weight:700;color:#fff;background:var(--red);padding:1px 8px;border-radius:999px}
+@keyframes pulso{0%,100%{box-shadow:0 6px 16px rgba(0,0,0,.3),0 0 0 0 rgba(176,30,40,0)}50%{box-shadow:0 6px 16px rgba(0,0,0,.3),0 0 0 8px rgba(176,30,40,.35)}}
+
+/* ---------- LOGIN: CARD MAIS COMPACTO ---------- */
+.card{max-width:340px;padding:24px 26px 26px}
+.card img{width:140px;height:44px;object-fit:cover;object-position:center 49%;margin:0 auto 10px}
+.card .os-badge{margin:4px auto 10px;padding:6px 18px 6px 22px;font-size:1.1rem}
+.card h1{font-size:.95rem;margin-bottom:16px}
+.card .field{margin-bottom:11px}
+.card label{font-size:.75rem;margin-bottom:4px}
+.card input{padding:9px 12px;font-size:.92rem}
+.card .pass-wrap input{padding-right:42px}
+.card .eye{width:40px}
+.card .err{min-height:1em;margin-bottom:6px;font-size:.8rem}
+.card .btn{padding:10px 18px}
+
+/* ---------- CABEÇALHO: "OS" SÓ LETRAS, GRANDE E DESTACADO ---------- */
+.brand{display:flex;align-items:center;gap:22px}
+.top .brand-os{padding:0;background:none;border-radius:0;box-shadow:none;margin:0;color:#fff;font-weight:700;font-size:2.4rem;line-height:1;letter-spacing:.14em;text-shadow:0 0 18px rgba(255,60,70,.75),0 2px 0 var(--red),0 4px 14px rgba(0,0,0,.5)}
+@media(max-width:600px){.top{padding:10px 14px}.top .brand{gap:12px}.top img{height:34px}.top .brand-os{font-size:1.5rem}.top span:not(.brand-os){display:none}}
