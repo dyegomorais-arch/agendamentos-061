@@ -1,6 +1,8 @@
 const RED = [176, 30, 40], INK = [38, 40, 44], SOFT = [242, 243, 245];
 const fmt = iso => iso.split('-').reverse().join('/');
 const semana = iso => ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'][new Date(iso + 'T12:00').getDay()];
+// horário do agendamento no PDF: só o início, pontual (ex.: 10h00)
+const horarioPdf = a => String(horaInt(a.horario)).padStart(2, '0') + 'h00';
 
 function cabecalho(doc, titulo, sub) {
   const w = doc.internal.pageSize.getWidth();
@@ -50,7 +52,7 @@ function gerarPdfConfirmacao(a) {
     body: [
       ['Serviço', a.servico], ['Empresa', a.empresa],
       ['Placa', a.placa], ['Tag', a.tag || '-'], ['Tipo de veículo', a.veiculo],
-      ['Data', fmt(a.data) + ' (' + semana(a.data) + ')'], ['Horário', faixaHorario(a)], ['Status', a.status], ['Alta', a.alta || '-'],
+      ['Data', fmt(a.data) + ' (' + semana(a.data) + ')'], ['Horário', horarioPdf(a)], ['Status', a.status], ['Alta', a.alta || '-'],
       ['Agendado por', a.criadoPor || '-'],
       ...(a.atualizadoPor ? [['Última alteração', a.atualizadoPor]] : []),
       // só no Salobo: mostra o endereço (Oficina Tauari) na tabela
@@ -125,7 +127,7 @@ function gerarPdfTecnico(periodo, itens) {
     startY: 48, theme: 'grid', styles: { fontSize: 10, cellPadding: 3.2, lineColor: [226, 228, 232] },
     headStyles: { fillColor: INK, textColor: 255 }, alternateRowStyles: { fillColor: SOFT },
     head: [['Data', 'Horário', 'Serviço', 'Placa', 'Tag', 'Veículo', 'Empresa', 'Local', 'Agendado por']],
-    body: itens.map(a => [fmt(a.data), faixaHorario(a), a.servico + (a.descricao ? ' - ' + a.descricao : ''), a.placa, a.tag || '-', a.veiculo, a.empresa, a.local, a.criadoPor || '-']),
+    body: itens.map(a => [fmt(a.data), horarioPdf(a), a.servico + (a.descricao ? ' - ' + a.descricao : ''), a.placa, a.tag || '-', a.veiculo, a.empresa, a.local, a.criadoPor || '-']),
     columnStyles: { 0: { fontStyle: 'bold' }, 1: { fontStyle: 'bold', textColor: RED } },
     margin: { bottom: 16 }
   });
