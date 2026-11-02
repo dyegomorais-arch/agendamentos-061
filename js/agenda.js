@@ -400,7 +400,9 @@ $('pdfTec').onclick = () => {
 };
 
 // ---------- sair ----------
-$('sair').onclick = async () => { await signOut(auth); location.href = 'index.html'; };
+const PORTAL = 'https://dyegomorais-arch.github.io/portaldeos/';
+let saindo = false;
+$('sair').onclick = async () => { saindo = true; await signOut(auth); location.href = PORTAL; };
 
 // ---------- inicialização ----------
 $('filtro').value = isoDe(new Date());
@@ -409,7 +411,7 @@ chips(); horarios();
 // ---------- autenticação + dados em tempo real ----------
 let parar = null, primeira = true;
 onAuthStateChanged(auth, user => {
-  if (!user) { if (parar) parar(); location.href = 'index.html'; return; }
+  if (!user) { if (parar) parar(); location.href = saindo ? PORTAL : 'index.html'; return; }
   document.body.style.visibility = 'visible';
   $('usr').textContent = user.email || '';
   go('painel');

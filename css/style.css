@@ -177,3 +177,12 @@ body:has(#login:not(.hide)){background:#111214}
 .drawer:not(.on){box-shadow:none}
 
 .top .t small .os-t{font-size:1.15rem;font-weight:700;letter-spacing:.2em;color:#fff;vertical-align:-1px}
+
+/* BOTÃO VOLTAR AO PORTAL DE OS (tela de login) */
+.voltar{position:absolute;top:20px;left:20px;z-index:3;display:inline-flex;align-items:center;gap:8px;padding:9px 16px 9px 12px;border-radius:99px;font-size:.8rem;font-weight:600;letter-spacing:.02em;line-height:1;color:#e8e9ec;text-decoration:none;background:rgba(26,27,31,.6);border:1px solid rgba(255,255,255,.14);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);opacity:0;animation:fadeup .5s var(--ease) 1.1s forwards;transition:border-color .2s,background .2s,box-shadow .2s}
+.voltar svg{width:14px;height:14px;flex:none;transition:transform .25s var(--ease)}
+.voltar:hover,.voltar:focus-visible{border-color:var(--red);background:rgba(176,30,40,.3);box-shadow:0 8px 22px rgba(176,30,40,.3)}
+.voltar:hover svg,.voltar:focus-visible svg{transform:translateX(-3px)}
+.voltar:focus-visible{outline:3px solid #ff7a84;outline-offset:3px}
+@media(max-width:480px){.voltar{top:14px;left:12px;padding:8px 13px 8px 10px;font-size:.76rem}}
+@media(prefers-reduced-motion:reduce){.voltar{animation:none;opacity:1}}
