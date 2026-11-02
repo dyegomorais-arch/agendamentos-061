@@ -3,17 +3,20 @@ import {
   collection, doc, addDoc, updateDoc, deleteDoc, getDoc, onSnapshot, serverTimestamp
 } from './firebase.js';
 
-const COLECAO = 'agendamentos'; 
+const COLECAO = 'agendamentos';
 const VAGAS = 1; // 1 técnico por local: no máximo 1 veículo por horário em C.I e 1 em Salobo (cada local conta separado)
 const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const br = i => i.split('-').reverse().join('/');
+// data local (YYYY-MM-DD) — evita virar "amanhã" à noite por causa do fuso (toISOString usa UTC)
+const isoDe = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const DIAS = ['DOMINGO', 'SEGUNDA FEIRA', 'TERÇA FEIRA', 'QUARTA FEIRA', 'QUINTA FEIRA', 'SEXTA FEIRA', 'SÁBADO'];
+const diaSem = i => DIAS[new Date(i + 'T12:00').getDay()];
+
 // cache em memória, mantido em tempo real pelo Firestore (onSnapshot)
 let cache = [];
 const load = () => cache;
-const DIAS = ['DOMINGO','SEGUNDA FEIRA','TERÇA FEIRA','QUARTA FEIRA','QUINTA FEIRA','SEXTA FEIRA','SÁBADO'];
-const br = iso => iso.split('-').reverse().join('/');
-const diaSemana = iso => DIAS[new Date(iso + 'T12:00').getDay()];
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const isoDe = d => d.toISOString().slice(0, 10);
+
 // ---------- quem criou / alterou ----------
 const nomeCurto = e => (e ? String(e).split('@')[0] : '');
 const quando = ts => {
@@ -23,90 +26,65 @@ const quando = ts => {
 // "versão" do registro = momento da última gravação (0 enquanto o servidor ainda não confirmou)
 const versaoDe = a => (a?.atualizadoEm || a?.criadoEm)?.toMillis?.() ?? 0;
 let versaoBase = 0; // versão do agendamento no momento em que abri para editar
-let visao = 'dia';
-let editandoId = null;
-const selectSyncs = {};
 
-// ---------- select animado (Serviço, Local, Procurar por, Status, Alta) ----------
-function customSelect(select) {
-  const wrap = document.createElement('div');
-  wrap.className = 'cselect';
-  const btn = document.createElement('button');
-  btn.type = 'button'; btn.className = 'cselect-btn';
-  btn.innerHTML = '<span class="cselect-val"></span><span class="cselect-arrow">›</span>';
-  const panel = document.createElement('div');
-  panel.className = 'cselect-panel';
-  [...select.options].forEach((o, i) => {
-    const opt = document.createElement('div');
-    opt.className = 'cselect-opt'; opt.dataset.value = o.value; opt.textContent = o.textContent;
-    opt.style.setProperty('--i', i);
-    panel.appendChild(opt);
-  });
-  wrap.append(btn, panel);
-  select.insertAdjacentElement('afterend', wrap);
-  select.classList.add('native-select');
-  selectSyncs[select.name] = sync;
+let editId = null, visao = 'dia', tt;
+const abertos = new Set(); // cartões expandidos (não fecham quando a lista atualiza em tempo real)
+const st = { servico: 'Instalação', local: 'Atendimento C.I', contato: 'GERSON SANTOS', alta: 'ALTA ABERTA' };
 
-  function sync() {
-    btn.querySelector('.cselect-val').textContent = select.options[select.selectedIndex]?.textContent || '';
-    panel.querySelectorAll('.cselect-opt').forEach(o => o.classList.toggle('sel', o.dataset.value === select.value));
+function toast(m) {
+  const t = $('toast'); t.textContent = m; t.classList.add('on');
+  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), 2800);
+}
+
+// ripple nos botões
+document.addEventListener('click', e => {
+  const b = e.target.closest('.btn'); if (!b) return;
+  const r = b.getBoundingClientRect(), s = document.createElement('span'), d = Math.max(r.width, r.height);
+  s.className = 'ripple';
+  s.style.cssText = `width:${d}px;height:${d}px;left:${e.clientX - r.left - d / 2}px;top:${e.clientY - r.top - d / 2}px`;
+  b.appendChild(s); setTimeout(() => s.remove(), 600);
+});
+
+// ---------- chips (Serviço, Local, Procurar por, Alta) ----------
+const OPC = {
+  chServ: ['servico', ['Instalação', 'Desinstalação', 'Manutenção']],
+  chLocal: ['local', ['Atendimento C.I', 'Salobo']],
+  chContato: ['contato', ['GERSON SANTOS', 'EVANDRO BRAGA']],
+  chAlta: ['alta', ['ALTA ABERTA', 'SEM ALTA']]
+};
+function chips() {
+  for (const [id, [k, ops]] of Object.entries(OPC))
+    $(id).innerHTML = ops.map(o => `<button type="button" class="chip ${st[k] === o ? 'on' : ''}" data-k="${k}" data-v="${o}">${o}</button>`).join('');
+}
+const ENDERECO_SALOBO = 'OFICINA TAUARI (SALOBO)';
+document.addEventListener('click', e => {
+  const c = e.target.closest('.chip'); if (!c) return;
+  st[c.dataset.k] = c.dataset.v; chips();
+  if (c.dataset.k === 'servico' || c.dataset.k === 'local') horarios(); // expediente depende do serviço e do local
+  if (c.dataset.k === 'local') {
+    // Salobo preenche o endereço sozinho; ao sair do Salobo limpa só se ainda for o texto automático
+    const f = $('form');
+    if (st.local === 'Salobo') f.endereco.value = ENDERECO_SALOBO;
+    else if (f.endereco.value === ENDERECO_SALOBO) f.endereco.value = '';
   }
-  sync();
-
-  btn.addEventListener('click', e => {
-    e.stopPropagation();
-    const abrir = !wrap.classList.contains('open');
-    document.querySelectorAll('.cselect.open').forEach(w => w.classList.remove('open'));
-    if (abrir) wrap.classList.add('open');
-  });
-  panel.addEventListener('click', e => {
-    const opt = e.target.closest('.cselect-opt'); if (!opt) return;
-    select.value = opt.dataset.value;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    sync(); wrap.classList.remove('open');
-  });
-}
-document.addEventListener('click', () => document.querySelectorAll('.cselect.open').forEach(w => w.classList.remove('open')));
-document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.cselect.open').forEach(w => w.classList.remove('open')); });
-
-function toast(msg) {
-  const t = $('toast'); t.textContent = msg; t.classList.add('on');
-  setTimeout(() => t.classList.remove('on'), 2800);
-}
-const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
-
-// ---------- período (dia / semana / mês / todos) ----------
-function periodo() {
-  const ref = $('filtro').value;
-  if (visao === 'todos' || !ref) return { ini: '0000-00-00', fim: '9999-99-99', rotulo: 'todos os períodos' };
-  if (visao === 'dia') return { ini: ref, fim: ref, rotulo: 'dia ' + br(ref) };
-  if (visao === 'mes') return { ini: ref.slice(0, 7) + '-01', fim: ref.slice(0, 7) + '-31', rotulo: 'mês ' + ref.slice(5, 7) + '/' + ref.slice(0, 4) };
-  const d = new Date(ref + 'T12:00');
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // segunda-feira
-  const ini = isoDe(d);
-  d.setDate(d.getDate() + 6);
-  const fim = isoDe(d);
-  return { ini, fim, rotulo: 'semana de ' + br(ini) + ' a ' + br(fim) };
-}
+});
 
 // ---------- vagas por horário ----------
 // Cada local tem o seu técnico (1 em C.I, 1 em Salobo). Cada serviço ocupa o técnico do seu local
 // durante TODAS as horas da sua duração (Instalação, Desinstalação e Manutenção: 2h).
-// Um horário só está livre se, em cada hora que o serviço ocuparia, o técnico daquele local estiver livre.
 const horasDe = (horario, servico) =>
   Array.from({ length: duracaoServico(servico) }, (_, k) => horaInt(horario) + k);
 
-const ocupadasNaHora = (data, hora, local, todos, excludeId) =>
-  (todos || load()).filter(a => a.data === data && a.local === local && a.status !== 'Cancelado' && a.id !== excludeId
+const ocupadasNaHora = (data, hora, local, excludeId) =>
+  load().filter(a => a.data === data && a.local === local && a.status !== 'Cancelado' && a.id !== excludeId
     && horasDe(a.horario, a.servico).includes(hora)).length;
 
-const vagasLivres = (data, horario, servico, local, todos, excludeId) =>
-  VAGAS - Math.max(...horasDe(horario, servico).map(h => ocupadasNaHora(data, h, local, todos, excludeId)));
+const vagasLivres = (data, horario, servico, local, excludeId) =>
+  VAGAS - Math.max(...horasDe(horario, servico).map(h => ocupadasNaHora(data, h, local, excludeId)));
 
 // ---------- detecção de conflito pós-gravação ----------
-// A checagem de vagas acima roda no navegador e não impede dois agendamentos simultâneos de
-// passarem juntos. Estas funções detectam o excesso (mais serviços que técnicos) assim que ele
-// aparece e avisam, para que alguém reagende um dos serviços.
+// A checagem de vagas roda no navegador e não impede dois agendamentos simultâneos de passarem
+// juntos. Estas funções detectam o excesso (mais serviços que técnicos no local) assim que ele aparece.
 function mapaOcupacao(todos) {
   const m = {};
   todos.forEach(a => {
@@ -115,7 +93,6 @@ function mapaOcupacao(todos) {
   });
   return m;
 }
-// quantos serviços passam do limite do técnico daquele local nas horas deste agendamento (0 = sem conflito)
 const excessoDe = (a, mapa) =>
   a.status === 'Cancelado' ? 0 : Math.max(0, ...horasDe(a.horario, a.servico).map(h => (mapa[a.data + '|' + a.local + '|' + h] || 0) - VAGAS));
 
@@ -129,13 +106,9 @@ function mostrarAlerta(a, excesso) {
     `Reagende ou cancele um dos serviços desse horário (a placa que você acabou de salvar é ${a.placa}).`;
   $('alerta').hidden = false;
 }
-function esconderAlerta() {
-  alertaDe = null;
-  $('alerta').hidden = true;
-}
-// Roda a cada atualização em tempo real. Só olha o agendamento que acabei de salvar (por 30 s,
-// para pegar o outro salvamento que chega com atraso) e o que já está no aviso; conflitos antigos
-// não geram aviso novo, mas continuam marcados na lista.
+function esconderAlerta() { alertaDe = null; $('alerta').hidden = true; }
+// Só olha o agendamento que acabei de salvar (por 30 s) e o que já está no aviso;
+// conflitos antigos não geram aviso novo, mas continuam marcados na lista.
 function verificaConflito() {
   const ids = [alertaDe, vigia && Date.now() < vigia.ate ? vigia.id : null].filter(Boolean);
   if (!ids.length) return;
@@ -145,66 +118,156 @@ function verificaConflito() {
     const exc = a ? excessoDe(a, mapa) : 0;
     if (exc > 0) return mostrarAlerta(a, exc);
   }
-  if (alertaDe) esconderAlerta(); // o conflito foi resolvido (reagendado, cancelado ou excluído)
+  if (alertaDe) esconderAlerta();
 }
 $('alertaFechar').addEventListener('click', () => { vigia = null; esconderAlerta(); });
 
-function atualizaHorarios(todos, excludeId, preferido) {
-  todos = todos || load();
-  const f = $('form'), data = f.data.value, servico = f.servico.value, local = f.local.value;
-  const dur = duracaoServico(servico);
-  const atual = preferido || f.horario.value;
+// ---------- horários do formulário ----------
+function horarios(pref) {
+  $('mSub').textContent = `${st.servico} · duração de ${duracaoServico(st.servico)}h · ${st.local} · ${VAGAS} técnico por horário`;
+  const f = $('form'), d = f.data.value, at = pref || f.horario.value;
   f.horario.innerHTML = '';
-  horariosDoServico(servico, local).forEach(h => {
+  horariosDoServico(st.servico, st.local).forEach(h => {
     const o = document.createElement('option');
     o.value = h;
-    const faixa = `${h} às ${horaDe(horaInt(h) + dur)}`;
-    if (!data) o.textContent = faixa;
+    const fx = `${h} às ${horaDe(horaInt(h) + duracaoServico(st.servico))}`;
+    if (!d) o.textContent = fx;
     else {
-      const livres = vagasLivres(data, h, servico, local, todos, excludeId);
-      o.textContent = livres > 0 ? `${faixa} (${livres} ${livres > 1 ? 'vagas' : 'vaga'})` : `${faixa} (lotado)`;
-      o.disabled = livres <= 0;
+      const l = vagasLivres(d, h, st.servico, st.local, editId);
+      o.textContent = l > 0 ? `${fx} (${l} ${l > 1 ? 'vagas' : 'vaga'})` : `${fx} (lotado)`;
+      o.disabled = l <= 0;
     }
     f.horario.appendChild(o);
   });
-  if (atual && [...f.horario.options].some(o => o.value === atual)) f.horario.value = atual;
-  if (f.horario.selectedOptions[0]?.disabled) {
-    const livre = [...f.horario.options].find(o => !o.disabled);
-    if (livre) f.horario.value = livre.value;
-  }
+  if (at && [...f.horario.options].some(o => o.value === at && !o.disabled)) f.horario.value = at;
+  else { const l = [...f.horario.options].find(o => !o.disabled); if (l) f.horario.value = l.value; }
 }
-const refreshHorarios = preferido => atualizaHorarios(undefined, editandoId, preferido);
+$('form').data.addEventListener('change', () => horarios());
 
-// ---------- lista ----------
-function render() {
-  const todos = load();
-  const { ini, fim, rotulo } = periodo();
-  const placaF = $('filtroPlaca').value.trim().toUpperCase();
-  const dados = todos.filter(a => a.data >= ini && a.data <= fim && (!placaF || a.placa.toUpperCase().includes(placaF)))
+// ---------- navegação (menu hambúrguer) ----------
+const TIT = { painel: 'Painel', agenda: 'Agenda' };
+function menu(on) {
+  $('drawer').classList.toggle('on', on);
+  $('veil').classList.toggle('on', on);
+  $('burger').classList.toggle('open', on);
+}
+$('burger').onclick = () => menu(!$('drawer').classList.contains('on'));
+$('veil').onclick = () => menu(false);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') menu(false); });
+
+function go(v) {
+  document.querySelectorAll('.view').forEach(s => { s.classList.add('hide'); s.style.animation = 'none'; });
+  const s = $('v-' + v); s.classList.remove('hide'); void s.offsetWidth; s.style.animation = '';
+  document.querySelectorAll('.nav[data-go]').forEach(n => n.classList.toggle('on', n.dataset.go === v));
+  $('titulo').firstChild.textContent = TIT[v];
+  menu(false); scrollTo({ top: 0, behavior: 'smooth' });
+  render(true);
+}
+
+// ---------- modal de novo agendamento / edição ----------
+function abrir() {
+  menu(false); horarios();
+  document.querySelectorAll('#modal .field,#modal .sec').forEach((el, i) => el.style.setProperty('--n', i));
+  $('modal').classList.add('on'); document.body.style.overflow = 'hidden';
+  setTimeout(() => $('form').placa.focus(), 450);
+}
+function fechar() {
+  $('modal').classList.remove('on'); document.body.style.overflow = '';
+  setTimeout(cancelar, 300);
+}
+$('fab').onclick = abrir; $('mx').onclick = fechar; $('btnCancel').onclick = fechar;
+$('modal').onclick = e => { if (e.target === $('modal')) fechar(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('modal').classList.contains('on')) fechar(); });
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-go]'); if (!g) return;
+  g.dataset.go === 'novo' ? abrir() : go(g.dataset.go);
+});
+
+// ---------- painel ----------
+function contar(el, n, anima) {
+  if (!anima || n === 0) { el.textContent = n; return; }
+  let i = 0; const p = Math.max(1, Math.ceil(n / 20));
+  const t = setInterval(() => { i = Math.min(n, i + p); el.textContent = i; if (i >= n) clearInterval(t); }, 30);
+}
+function painel(anima) {
+  const t = load(), hj = isoDe(new Date()), h = new Date().getHours();
+  const ini = (() => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return isoDe(d); })();
+  const fimSem = isoDe(new Date(new Date(ini + 'T12:00').getTime() + 6 * 864e5));
+  const nome = nomeCurto(auth.currentUser?.email);
+  $('hello').textContent = (h >= 5 && h < 12 ? 'Bom dia' : h >= 12 && h < 18 ? 'Boa tarde' : 'Boa noite') + (nome ? ', ' + nome : '') + ' 👋';
+  const ativos = t.filter(a => a.status !== 'Cancelado');
+  const S = [
+    ['Hoje', ativos.filter(a => a.data === hj).length, 'dia'],
+    ['Esta semana', ativos.filter(a => a.data >= ini && a.data <= fimSem).length, 'semana'],
+    ['Este mês', ativos.filter(a => a.data.slice(0, 7) === hj.slice(0, 7)).length, 'mes'],
+    ['Total', ativos.length, 'todos']
+  ];
+  $('stats').innerHTML = S.map((s, i) => `<div class="stat" style="--i:${i}${anima ? '' : ';animation:none'}" data-vis="${s[2]}"><b>0</b><span>${s[0]}</span></div>`).join('');
+  document.querySelectorAll('.stat b').forEach((b, i) => contar(b, S[i][1], anima));
+  const prox = ativos.filter(a => a.data >= hj && a.status !== 'Concluído')
+    .sort((a, b) => (a.data + a.horario).localeCompare(b.data + b.horario)).slice(0, 4);
+  $('proximos').innerHTML = prox.length
+    ? prox.map((a, i) => card(a, i, false, anima)).join('')
+    : '<p class="empty">Nenhum serviço agendado. Que tal criar o primeiro?</p>';
+  $('bdTotal').textContent = ativos.length;
+}
+document.addEventListener('click', e => {
+  const s = e.target.closest('.stat'); if (!s) return;
+  visao = s.dataset.vis;
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === visao));
+  $('filtro').value = isoDe(new Date()); go('agenda');
+});
+
+// ---------- agenda ----------
+function periodo() {
+  const r = $('filtro').value;
+  if (visao === 'todos' || !r) return { ini: '0000-00-00', fim: '9999-99-99', rotulo: 'todos os períodos' };
+  if (visao === 'dia') return { ini: r, fim: r, rotulo: 'dia ' + br(r) };
+  if (visao === 'mes') return { ini: r.slice(0, 7) + '-01', fim: r.slice(0, 7) + '-31', rotulo: 'mês ' + r.slice(5, 7) + '/' + r.slice(0, 4) };
+  const d = new Date(r + 'T12:00');
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // segunda-feira
+  const ini = isoDe(d);
+  d.setDate(d.getDate() + 6);
+  const fim = isoDe(d);
+  return { ini, fim, rotulo: 'semana de ' + br(ini) + ' a ' + br(fim) };
+}
+
+const classeStatus = s => s === 'Concluído' ? 'ok' : s === 'Confirmado' ? 'cf' : s === 'Cancelado' ? 'ca' : '';
+
+function card(a, i, acoes = true, anima = true) {
+  const ex = excessoDe(a, mapaOcupacao(load())) > 0;
+  const animStyle = anima ? `animation-delay:${i * 60}ms` : 'animation:none';
+  return `<div class="ag ${ex ? 'conf' : ''} ${a.status === 'Concluído' ? 'done' : ''} ${abertos.has(a.id) ? 'open' : ''}" style="${animStyle}" data-open="${a.id}">
+ <div class="hr">${a.horario}<small>${horaDe(horaInt(a.horario) + duracaoServico(a.servico))}</small></div>
+ <div class="m"><b>${esc(a.placa)}</b> · ${esc(a.servico)}${ex ? ' <span class="warn" title="Este horário tem mais de um serviço no mesmo local. Reagende um deles.">⚠ acima do limite</span>' : ''}<div>${esc(a.empresa)} · ${esc(a.veiculo)} · ${esc(a.local)} · ${br(a.data)}</div></div>
+ ${acoes ? `<div><button class="ico" title="Concluir / reabrir" data-ok="${a.id}">✅</button><button class="ico" title="Editar" data-edit="${a.id}">✏️</button><button class="ico" title="PDF de confirmação" data-pdf="${a.id}">📄</button><button class="ico" title="Excluir" data-del="${a.id}">🗑️</button></div>` : '<div></div>'}
+ <div class="det"><p><span class="badge ${classeStatus(a.status)}">${esc(a.status)}</span><span class="badge ${a.alta === 'SEM ALTA' ? 'sa' : 'al'}">${esc(a.alta || '-')}</span></p>
+ <p>Tag: ${esc(a.tag || '-')} · Procurar por: ${esc(a.contato)}</p><p>Endereço: ${esc(a.endereco)}</p>${a.descricao ? `<p>Obs.: ${esc(a.descricao)}</p>` : ''}
+ <p class="quem">Agendado por ${esc(a.criadoPor || '-')}${a.atualizadoPor ? `<small>alterado por ${esc(nomeCurto(a.atualizadoPor))}${quando(a.atualizadoEm) ? ' · ' + quando(a.atualizadoEm) : ''}</small>` : ''}</p></div></div>`;
+}
+
+function render(anima = false) {
+  painel(anima);
+  const { ini, fim, rotulo } = periodo(), pf = $('filtroPlaca').value.trim().toUpperCase();
+  const dd = load().filter(a => a.data >= ini && a.data <= fim && (!pf || a.placa.toUpperCase().includes(pf)))
     .sort((a, b) => (a.data + a.horario).localeCompare(b.data + b.horario));
-  $('resumo').textContent = `${dados.length} agendamento${dados.length === 1 ? '' : 's'} · ${rotulo}${placaF ? ' · placa "' + placaF + '"' : ''}`;
-  atualizaHorarios(todos, editandoId);
-  if (!dados.length) {
-    $('lista').innerHTML = '<p class="empty">Nenhum agendamento neste período. Preencha o formulário para criar um.</p>';
-    return;
-  }
-  const grupos = {};
-  const ocup = mapaOcupacao(todos);
-  dados.forEach(a => (grupos[a.data] = grupos[a.data] || []).push(a));
-  $('lista').innerHTML = Object.entries(grupos).map(([d, itens]) => `
-    <div class="day"><h3>AGENDA DE SERVIÇO - ${br(d)} · ${diaSemana(d)}</h3>
-    <div class="tw"><table><thead><tr><th>Serviço</th><th>Placa</th><th>Tag</th><th>Veículo</th><th>Horário</th><th>Empresa</th><th>Local</th><th>Status</th><th>Alta</th><th>Agendado por</th><th></th></tr></thead>
-    <tbody>${itens.map((a, i) => { const excede = excessoDe(a, ocup) > 0; return `<tr class="${excede ? 'conflito' : ''}" style="animation-delay:${i * 60}ms">
-      <td>${esc(a.servico)}</td><td><b>${esc(a.placa)}</b></td><td>${esc(a.tag)}</td>
-      <td>${esc(a.veiculo)}</td><td>${a.horario}${excede ? '<span class="warn" title="Este horário tem mais de um serviço no mesmo local. Reagende um deles.">⚠ acima do limite</span>' : ''}</td><td>${esc(a.empresa)}</td><td>${esc(a.local)}</td>
-      <td><span class="badge b-${a.status}">${a.status}</span></td>
-      <td>${a.alta ? `<span class="badge ${a.alta === 'SEM ALTA' ? 'b-semalta' : 'b-altaaberta'}">${esc(a.alta)}</span>` : '-'}</td>
-      <td class="quem">${a.criadoPor ? `<span title="${esc(a.criadoPor)}">${esc(a.criadoPor)}</span>` : '-'}${a.atualizadoPor ? `<small title="${esc(a.atualizadoPor)}">alterado por ${esc(nomeCurto(a.atualizadoPor))}${quando(a.atualizadoEm) ? ' · ' + quando(a.atualizadoEm) : ''}</small>` : ''}</td>
-      <td><button class="ico" title="Editar" data-edit="${a.id}">✏️</button><button class="ico" title="PDF de confirmação" data-pdf="${a.id}">📄</button><button class="ico" title="Excluir" data-del="${a.id}">🗑️</button></td>
-    </tr>`; }).join('')}</tbody></table></div></div>`).join('');
+  $('resumo').textContent = `${dd.length} agendamento${dd.length === 1 ? '' : 's'} · ${rotulo}${pf ? ' · placa "' + pf + '"' : ''}`;
+  if ($('modal').classList.contains('on')) horarios(); // vagas atualizam em tempo real com o modal aberto
+  if (!dd.length) { $('lista').innerHTML = '<p class="empty">Nenhum agendamento neste período.</p>'; return; }
+  const g = {}; dd.forEach(a => (g[a.data] = g[a.data] || []).push(a));
+  $('lista').innerHTML = Object.entries(g).map(([d, it]) =>
+    `<div class="day"><h3>AGENDA DE SERVIÇO - ${br(d)} · ${diaSem(d)}</h3>${it.map((a, i) => card(a, i, true, anima)).join('')}</div>`).join('');
 }
+$('tabs').onclick = e => {
+  if (!e.target.dataset.v) return;
+  visao = e.target.dataset.v;
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b === e.target));
+  render(true);
+};
+$('filtro').onchange = () => render(true);
+let tdeb; $('filtroPlaca').oninput = () => { clearTimeout(tdeb); tdeb = setTimeout(() => render(false), 180); };
 
-// ---------- eventos ----------
+// ---------- salvar (cria / atualiza no Firestore) ----------
 function msgErro(err) {
   if (err?.code === 'permission-denied') return 'Sem permissão. Faça login novamente.';
   if (err?.code === 'unavailable') return 'Sem conexão com o servidor. Tente novamente.';
@@ -213,16 +276,22 @@ function msgErro(err) {
 
 $('form').addEventListener('submit', async e => {
   e.preventDefault();
-  const a = Object.fromEntries(new FormData(e.target));
-  a.placa = a.placa.toUpperCase(); a.status = 'Agendado';
-  const todos = load(); const idAtual = editandoId;
+  const f = $('form');
+  const a = {
+    servico: st.servico, descricao: f.descricao.value, placa: f.placa.value.toUpperCase(), tag: f.tag.value,
+    veiculo: f.veiculo.value.trim(), empresa: f.empresa.value, data: f.data.value, horario: f.horario.value,
+    local: st.local, endereco: f.endereco.value, contato: st.contato, alta: st.alta
+  };
+  if (!a.veiculo) return toast('Selecione o tipo de veículo.');
+  const idAtual = editId, todos = load();
   const dur = duracaoServico(a.servico);
   if (!cabeNoExpediente(horaInt(a.horario), dur, a.local))
     return toast(`${a.servico} leva ${dur}h e não cabe nesse horário (expediente ${a.local}: ${textoExpediente(a.local)}). Escolha outro.`);
-  if (vagasLivres(a.data, a.horario, a.servico, a.local, todos, idAtual) <= 0)
+  if (vagasLivres(a.data, a.horario, a.servico, a.local, idAtual) <= 0)
     return toast(`Horário lotado: ${a.horario} às ${horaDe(horaInt(a.horario) + dur)} em ${br(a.data)} já tem o técnico de ${a.local} ocupado. Escolha outro horário.`);
   if (todos.some(x => x.data === a.data && x.horario === a.horario && x.placa === a.placa && x.id !== idAtual))
     return toast(`A placa ${a.placa} já está agendada em ${br(a.data)} às ${a.horario}.`);
+
   const btn = $('btnSalvar'); btn.disabled = true;
   let idSalvo = idAtual;
   try {
@@ -231,7 +300,7 @@ $('form').addEventListener('submit', async e => {
       // aviso de conflito: alguém salvou este agendamento depois que eu abri para editar?
       const atual = await getDoc(doc(db, COLECAO, idAtual));
       if (!atual.exists()) {
-        btn.disabled = false; cancelarEdicao(); render();
+        btn.disabled = false; fechar(); render();
         return toast('Este agendamento foi excluído por outra pessoa.');
       }
       const dados = { id: idAtual, ...atual.data() };
@@ -240,52 +309,48 @@ $('form').addEventListener('submit', async e => {
         const manter = confirm(`${por} alterou este agendamento em ${quando(dados.atualizadoEm || dados.criadoEm)}, depois que você abriu a edição.\n\nOK = sobrescrever com o que você digitou\nCancelar = descartar o seu e carregar a versão mais recente`);
         if (!manter) { btn.disabled = false; iniciarEdicao(dados); return toast('Versão mais recente carregada. Confira e salve de novo se quiser.'); }
       }
+      // o status NÃO é alterado na edição (Concluído/Confirmado/etc. são preservados)
+      await updateDoc(doc(db, COLECAO, idAtual), { ...a, atualizadoEm: serverTimestamp(), atualizadoPor: quem });
+    } else {
+      idSalvo = (await addDoc(collection(db, COLECAO), { ...a, status: 'Agendado', criadoEm: serverTimestamp(), criadoPor: quem })).id;
     }
-    if (idAtual) await updateDoc(doc(db, COLECAO, idAtual), { ...a, atualizadoEm: serverTimestamp(), atualizadoPor: quem });
-    else idSalvo = (await addDoc(collection(db, COLECAO), { ...a, criadoEm: serverTimestamp(), criadoPor: quem })).id;
   } catch (err) {
     console.error(err); btn.disabled = false;
     return toast(msgErro(err));
   }
   btn.disabled = false;
   const eraEdicao = !!idAtual;
-  cancelarEdicao();
-  $('filtro').value = a.data; render(); toast(eraEdicao ? 'Agendamento atualizado!' : 'Agendamento salvo!');
+  fechar();
+  $('filtro').value = a.data; visao = 'dia';
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === 'dia'));
+  toast(eraEdicao ? 'Agendamento atualizado! ✅' : 'Agendamento salvo! ✅');
+  go('agenda');
   vigia = { id: idSalvo, ate: Date.now() + 30000 };
   verificaConflito();
 });
-$('form').data.addEventListener('change', () => refreshHorarios());
-$('form').servico.addEventListener('change', () => refreshHorarios());
-$('form').local.addEventListener('change', () => refreshHorarios());
+
+function cancelar() {
+  editId = null; versaoBase = 0;
+  $('form').reset();
+  st.servico = 'Instalação'; st.local = 'Atendimento C.I'; st.contato = 'GERSON SANTOS'; st.alta = 'ALTA ABERTA';
+  chips(); horarios();
+  $('tituloForm').textContent = 'Novo agendamento'; $('btnSalvar').textContent = 'Agendar';
+}
+$('btnEnd').onclick = () => $('form').endereco.value = 'Avenida Redenção, Quadra 01, Lotes 39, 40 e 41, Linha Verde, Parauapebas - PA, CEP 68.515-000';
 
 // ---------- edição de agendamento existente ----------
 function iniciarEdicao(a) {
   if (!a) return;
-  editandoId = a.id;
-  versaoBase = versaoDe(a);
+  editId = a.id; versaoBase = versaoDe(a);
   const f = $('form');
-  ['servico', 'descricao', 'placa', 'tag', 'veiculo', 'empresa', 'data', 'horario', 'local', 'endereco', 'contato', 'alta']
-    .forEach(n => { if (f[n]) f[n].value = a[n] ?? (n === 'alta' ? 'ALTA ABERTA' : ''); });
-  refreshHorarios(a.horario);
-  ['servico', 'local', 'contato', 'alta'].forEach(n => selectSyncs[n]?.());
-  $('tituloForm').textContent = 'Editar agendamento';
-  $('btnSalvar').textContent = 'Salvar alterações';
-  $('btnCancelarEdicao').style.display = 'block';
-  document.querySelector('.panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  toast('Editando agendamento — altere os campos e salve.');
+  ['descricao', 'placa', 'tag', 'veiculo', 'empresa', 'data', 'endereco'].forEach(n => f[n].value = a[n] || '');
+  Object.assign(st, { servico: a.servico, local: a.local, contato: a.contato, alta: a.alta || 'ALTA ABERTA' });
+  chips(); horarios(a.horario);
+  $('tituloForm').textContent = 'Editar agendamento'; $('btnSalvar').textContent = 'Salvar alterações';
+  abrir();
 }
-function cancelarEdicao() {
-  editandoId = null;
-  $('form').reset();
-  refreshHorarios();
-  ['servico', 'local', 'contato', 'status', 'alta'].forEach(n => selectSyncs[n]?.());
-  $('tituloForm').textContent = 'Novo agendamento';
-  $('btnSalvar').textContent = 'Agendar';
-  $('btnCancelarEdicao').style.display = 'none';
-}
-$('btnCancelarEdicao').addEventListener('click', cancelarEdicao);
 
-// ---------- geração de PDF sem travar a interface ----------
+// ---------- ações nos cartões ----------
 function comLoading(botao, msgIni, gerar, msgFim) {
   if (botao) botao.disabled = true;
   toast(msgIni);
@@ -296,63 +361,62 @@ function comLoading(botao, msgIni, gerar, msgFim) {
   }, 30); // dá um frame pro navegador pintar o toast antes do jsPDF travar a thread
 }
 
-$('lista').addEventListener('click', async e => {
-  const btn = e.target.closest('button'); if (!btn) return;
-  const del = btn.dataset.del, pdf = btn.dataset.pdf, edit = btn.dataset.edit;
+async function acao(e) {
+  const b = e.target.closest('button');
+  if (!b) {
+    const c = e.target.closest('[data-open]');
+    if (c) { const id = c.dataset.open; c.classList.toggle('open'); c.classList.contains('open') ? abertos.add(id) : abertos.delete(id); }
+    return;
+  }
+  const { del, pdf, edit, ok } = b.dataset;
+  if (ok) {
+    const a = load().find(x => x.id === ok); if (!a) return;
+    const novo = a.status === 'Concluído' ? 'Agendado' : 'Concluído';
+    try {
+      await updateDoc(doc(db, COLECAO, ok), { status: novo, atualizadoEm: serverTimestamp(), atualizadoPor: auth.currentUser?.email || '' });
+      toast(novo === 'Concluído' ? 'Serviço concluído! ✅' : 'Agendamento reaberto.');
+    } catch (err) { console.error(err); toast(msgErro(err)); }
+  }
   if (del && confirm('Excluir este agendamento?')) {
     try {
       await deleteDoc(doc(db, COLECAO, del));
-      if (editandoId === del) cancelarEdicao();
+      abertos.delete(del);
       toast('Agendamento excluído.');
     } catch (err) { console.error(err); toast('Não foi possível excluir. Tente novamente.'); }
   }
-  if (pdf) comLoading(btn, 'Gerando PDF de confirmação...', () => gerarPdfConfirmacao(load().find(a => a.id === pdf)), 'PDF de confirmação gerado!');
+  if (pdf) comLoading(b, 'Gerando PDF de confirmação...', () => gerarPdfConfirmacao(load().find(a => a.id === pdf)), 'PDF de confirmação gerado! 📄');
   if (edit) iniciarEdicao(load().find(a => a.id === edit));
-});
+}
+$('lista').addEventListener('click', acao);
+$('proximos').addEventListener('click', acao);
 
-$('tabs').addEventListener('click', e => {
-  if (!e.target.dataset.v) return;
-  visao = e.target.dataset.v;
-  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b === e.target));
-  render();
-});
-$('filtro').addEventListener('change', render);
-
-$('pdfTec').addEventListener('click', () => {
+$('pdfTec').onclick = () => {
   if (visao !== 'todos' && !$('filtro').value) return toast('Escolha a data de referência para gerar o PDF do técnico.');
-  const { ini, fim, rotulo } = periodo();
-  const placaF = $('filtroPlaca').value.trim().toUpperCase();
-  const itens = load().filter(a => a.data >= ini && a.data <= fim && (!placaF || a.placa.toUpperCase().includes(placaF)))
+  const p = periodo(), pf = $('filtroPlaca').value.trim().toUpperCase();
+  const it = load().filter(a => a.data >= p.ini && a.data <= p.fim && (!pf || a.placa.toUpperCase().includes(pf)))
     .sort((a, b) => (a.data + a.horario).localeCompare(b.data + b.horario));
-  if (!itens.length) return toast('Não há agendamentos nesse período.');
-  comLoading($('pdfTec'), 'Gerando PDF do técnico...', () => gerarPdfTecnico({ ini, fim, rotulo }, itens), 'PDF do técnico gerado!');
-});
-$('filtroPlaca').addEventListener('input', debounce(render, 180));
-// Local = Salobo preenche o endereço automaticamente com a Oficina Tauari; ao sair do Salobo,
-// limpa o campo só se ainda for esse texto automático (não apaga um endereço digitado à mão).
-const ENDERECO_SALOBO = 'OFICINA TAUARI (SALOBO)';
-$('form').local.addEventListener('change', () => {
-  const f = $('form');
-  if (f.local.value === 'Salobo') f.endereco.value = ENDERECO_SALOBO;
-  else if (f.endereco.value === ENDERECO_SALOBO) f.endereco.value = '';
-});
-$('btnEndereco').addEventListener('click', () => {
-  $('form').endereco.value = 'Avenida Redenção, Quadra 01, Lotes 39, 40 e 41, Linha Verde, Parauapebas - PA, CEP 68.515-000';
-});
-['servico', 'local', 'contato', 'status', 'alta'].forEach(n => customSelect($('form')[n]));
-$('sair').addEventListener('click', async () => { await signOut(auth); location.href = 'index.html'; });
+  if (!it.length) return toast('Não há agendamentos nesse período.');
+  comLoading($('pdfTec'), 'Gerando PDF do técnico...', () => gerarPdfTecnico(p, it), 'PDF do técnico gerado! 📄');
+};
 
-const hoje = new Date(); hoje.setHours(12);
-$('filtro').value = isoDe(hoje);
+// ---------- sair ----------
+$('sair').onclick = async () => { await signOut(auth); location.href = 'index.html'; };
+
+// ---------- inicialização ----------
+$('filtro').value = isoDe(new Date());
+chips(); horarios();
 
 // ---------- autenticação + dados em tempo real ----------
-let parar = null;
+let parar = null, primeira = true;
 onAuthStateChanged(auth, user => {
   if (!user) { if (parar) parar(); location.href = 'index.html'; return; }
   document.body.style.visibility = 'visible';
+  $('usr').textContent = user.email || '';
+  go('painel');
+  if (parar) parar();
   parar = onSnapshot(collection(db, COLECAO), snap => {
     cache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    render();
+    render(primeira); primeira = false;
     verificaConflito();
   }, err => {
     console.error(err);

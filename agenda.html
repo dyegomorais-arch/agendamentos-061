@@ -6,86 +6,74 @@
 <title>Sillion | Agenda de Serviço</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=4">
+<link rel="stylesheet" href="css/style.css?v=9">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 </head>
 <body style="visibility:hidden">
-<header class="top">
-  <div class="brand">
-    <img src="assets/logo-escuro.png" alt="Sillion">
-    <span class="brand-os">OS 061</span>
-  </div>
-  <div><span>Agenda de serviço</span><button class="btn ghost" id="sair">Sair</button></div>
-</header>
+<div id="app">
+ <header class="top"><button class="burger" id="burger" aria-label="Menu"><i></i><i></i><i></i></button>
+  <div class="t" id="titulo">Painel<small><b class="os-t">OS 061</b> · AGENDA DE SERVIÇO</small></div><img src="assets/logo-escuro.png" alt="Sillion"></header>
 
-<div class="alerta" id="alerta" role="alert" hidden>
+ <div class="alerta" id="alerta" role="alert" hidden>
   <span id="alertaTxt"></span>
   <button type="button" id="alertaFechar" title="Fechar aviso" aria-label="Fechar aviso">×</button>
-</div>
+ </div>
 
-<div class="wrap">
-  <section class="panel">
-    <h2 id="tituloForm">Novo agendamento</h2>
-    <form id="form">
-      <div class="field"><label>Serviço</label>
-        <select name="servico" required>
-          <option>Instalação</option><option>Desinstalação</option><option>Manutenção</option>
-        </select></div>
-      <div class="field"><label>Descrição (opcional)</label><input name="descricao" placeholder="Ex.: telemetria apagada"></div>
-      <div class="row2">
-        <div class="field"><label>Placa</label><input name="placa" required maxlength="8" style="text-transform:uppercase"></div>
-        <div class="field"><label>Tag</label><input name="tag"></div>
-      </div>
-      <div class="field"><label>Tipo de veículo</label><input name="veiculo" placeholder="Ônibus, Hilux, Caminhão..." required></div>
-      <div class="field"><label>Empresa</label><input name="empresa" required></div>
-      <div class="row2">
-        <div class="field"><label>Data</label><input type="date" name="data" required></div>
-        <div class="field"><label>Horário</label>
-          <select name="horario"></select></div>
-      </div>
-      <div class="field"><label>Local</label>
-        <select name="local"><option>Atendimento C.I</option><option>Salobo</option></select></div>
-      <div class="field">
-        <div class="field-head"><label>Endereço do atendimento</label><button type="button" class="mini" id="btnEndereco">Usar endereço Sillion</button></div>
-        <input name="endereco" required>
-      </div>
-      <div class="field"><label>Procurar por</label>
-        <select name="contato" required><option>GERSON SANTOS</option><option>EVANDRO BRAGA</option></select></div>
-      <div class="field"><label>Status</label>
-        <select name="status"><option>Agendado</option></select></div>
-      <div class="field"><label>Alta</label>
-        <select name="alta"><option>ALTA ABERTA</option><option>SEM ALTA</option></select></div>
-      <button class="btn full" type="submit" id="btnSalvar">Agendar</button>
-      <button type="button" class="btn ghost full" id="btnCancelarEdicao" style="display:none;margin-top:8px">Cancelar edição</button>
-    </form>
+ <div class="veil" id="veil"></div>
+ <aside class="drawer" id="drawer">
+  <div class="logo"><img src="assets/logo-escuro.png" alt=""><b>OS 061</b></div>
+  <button class="nav" style="--i:0" data-go="painel"><span class="ic">🏠</span>Painel</button>
+  <button class="nav" style="--i:1" data-go="novo"><span class="ic">➕</span>Novo agendamento</button>
+  <button class="nav" style="--i:2" data-go="agenda"><span class="ic">📅</span>Agenda<span class="bd" id="bdTotal">0</span></button>
+  <div class="sp"></div><div class="usr" id="usr"></div>
+  <button class="nav" style="--i:3" id="sair"><span class="ic">🚪</span>Sair</button>
+ </aside>
+
+ <div class="wrap">
+  <section class="view" id="v-painel">
+   <div class="hello" id="hello"></div><p class="sub">Resumo da sua agenda em tempo real.</p>
+   <div class="stats" id="stats"></div>
+   <div class="panel"><h2>Ações rápidas</h2><div class="quick"><button class="btn" data-go="novo">➕ Novo agendamento</button><button class="btn ghost" data-go="agenda">📅 Ver agenda</button></div></div>
+   <div class="panel"><h2>Próximos serviços</h2><div id="proximos"></div></div>
   </section>
 
-  <section class="panel">
-    <h2>Agenda</h2>
-    <div class="tabs" id="tabs">
-      <button data-v="dia" class="on">Dia</button>
-      <button data-v="semana">Semana</button>
-      <button data-v="mes">Mês</button>
-      <button data-v="todos">Todos</button>
-    </div>
-    <div class="bar">
-      <div class="field"><label>Data de referência</label><input type="date" id="filtro"></div>
-      <div class="field campo-placa"><label>Filtrar placa</label><input id="filtroPlaca" placeholder="Ex.: ABC1D23" style="text-transform:uppercase"></div>
-      <button class="btn" id="pdfTec">PDF do técnico</button>
-    </div>
-    <p class="resumo" id="resumo"></p>
-    <div id="lista"></div>
-  </section>
+  <section class="view hide" id="v-agenda"><div class="panel"><h2>Agenda</h2>
+   <div class="tabs" id="tabs"><button data-v="dia" class="on">Dia</button><button data-v="semana">Semana</button><button data-v="mes">Mês</button><button data-v="todos">Todos</button></div>
+   <div class="bar"><div class="field"><label>Data de referência</label><input type="date" id="filtro"></div><div class="field" style="max-width:150px;flex:0 0 auto"><label>Filtrar placa</label><input id="filtroPlaca" placeholder="Ex.: ABC1D23" style="text-transform:uppercase"></div><button class="btn" id="pdfTec">📄 PDF do técnico</button></div>
+   <p class="resumo" id="resumo"></p><div id="lista"></div></div></section>
+ </div>
+ <footer class="foot">OS 061 · v9</footer>
+
+ <div class="modal" id="modal"><div class="mbox" role="dialog" aria-modal="true">
+  <div class="mh"><div><h2 id="tituloForm">Novo agendamento</h2><small id="mSub"></small></div><button type="button" class="mx" id="mx" aria-label="Fechar">✕</button></div>
+  <form id="form"><div class="mb">
+   <div class="sec">SERVIÇO</div>
+   <div class="field"><div class="chips" id="chServ"></div></div>
+   <div class="field"><label>Descrição (opcional)</label><input name="descricao" placeholder="Ex.: telemetria apagada"></div>
+   <div class="sec">VEÍCULO</div>
+   <div class="row2"><div class="field"><label>Placa</label><input name="placa" required maxlength="8" style="text-transform:uppercase"></div><div class="field"><label>Tag</label><input name="tag"></div></div>
+   <div class="field"><label>Tipo de veículo</label><input name="veiculo" placeholder="Ônibus, Hilux, Caminhão..." required maxlength="60"></div>
+   <div class="field"><label>Empresa</label><input name="empresa" required></div>
+   <div class="sec">QUANDO E ONDE</div>
+   <div class="row2"><div class="field"><label>Data</label><input type="date" name="data" required></div><div class="field"><label>Horário</label><select name="horario"></select></div></div>
+   <div class="field"><label>Local</label><div class="chips" id="chLocal"></div></div>
+   <div class="field"><div class="fh"><label>Endereço do atendimento</label><button type="button" class="mini" id="btnEnd">Usar endereço Sillion</button></div><input name="endereco" required></div>
+   <div class="sec">DETALHES</div>
+   <div class="field"><label>Procurar por</label><div class="chips" id="chContato"></div></div>
+   <div class="field"><label>Alta</label><div class="chips" id="chAlta"></div></div>
+  </div>
+  <div class="mf"><button type="button" class="btn ghost" id="btnCancel">Cancelar</button><button class="btn" type="submit" id="btnSalvar" style="flex:1">Agendar</button></div>
+  </form></div></div>
+ <button class="fab" id="fab" title="Novo agendamento" aria-label="Novo agendamento">+</button>
 </div>
-<footer class="os-foot">OS 061</footer>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="js/logo-data.js"></script>
 <script src="js/horarios.js"></script>
-<script src="js/pdf.js"></script>
-<script type="module" src="js/agenda.js"></script>
+<script src="js/pdf.js?v=9"></script>
+<script type="module" src="js/agenda.js?v=9"></script>
 </body>
 </html>

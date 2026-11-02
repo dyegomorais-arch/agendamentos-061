@@ -1,8 +1,22 @@
+// Baixa o PDF direto para a pasta de downloads, sem abrir em nova aba/visualizador.
+// (tipo "octet-stream" + atributo download impedem o navegador de abrir o arquivo sozinho)
+function salvarPdf(doc, nome) {
+  const blob = new Blob([doc.output('arraybuffer')], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = nome; a.style.display = 'none';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 1500);
+}
+
 const RED = [176, 30, 40], INK = [38, 40, 44], SOFT = [242, 243, 245];
-const fmt = iso => iso.split('-').reverse().join('/');
-const semana = iso => ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'][new Date(iso + 'T12:00').getDay()];
+// Localização da Sillion C.I no Google Maps (link aparece no PDF só quando o local é Atendimento C.I)
+const MAPS_CI = 'https://www.google.com/maps/place/SILLION+C.I+Paraupebas+I/@-6.0966629,-49.8717792,17z/data=!3m1!4b1!4m6!3m5!1s0x92dd51000621b71d:0x3d96dd61011ce8a0!8m2!3d-6.0966682!4d-49.8691989!16s%2Fg%2F11x162yjyl';
+const ehCI = l => String(l || '').trim().toLowerCase() === 'atendimento c.i';
 // horário do agendamento no PDF: só o início, pontual (ex.: 10h00)
 const horarioPdf = a => String(horaInt(a.horario)).padStart(2, '0') + 'h00';
+const fmt = iso => iso.split('-').reverse().join('/');
+const semana = iso => ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'][new Date(iso + 'T12:00').getDay()];
 
 function cabecalho(doc, titulo, sub) {
   const w = doc.internal.pageSize.getWidth();
@@ -62,59 +76,90 @@ function gerarPdfConfirmacao(a) {
 
   // Salobo: PDF só com a tabela (sem "Onde comparecer" e sem orientações)
   if (String(a.local || '').trim().toLowerCase() !== 'salobo') {
+    const ci = ehCI(a.local), ex = ci ? 10 : 0; // com link do mapa a caixa fica 10 mm mais alta
     let y = doc.lastAutoTable.finalY + 12;
-    doc.setFillColor(...SOFT).roundedRect(14, y, 182, 42, 3, 3, 'F');
-    doc.setFillColor(...RED).rect(14, y, 3, 42, 'F');
+    doc.setFillColor(...SOFT).roundedRect(14, y, 182, 42 + ex, 3, 3, 'F');
+    doc.setFillColor(...RED).rect(14, y, 3, 42 + ex, 'F');
     doc.setFont('helvetica', 'bold').setFontSize(12).setTextColor(...INK).text('Onde comparecer', 22, y + 9);
     doc.setFont('helvetica', 'normal').setFontSize(10.5);
     doc.text('Local: ' + a.local, 22, y + 18);
     doc.text(doc.splitTextToSize('Endereço: ' + a.endereco, 168), 22, y + 25);
     doc.setFont('helvetica', 'bold').text('Procurar por: ' + a.contato, 22, y + 37);
 
+    // Só no Atendimento C.I: pino de GPS + link "Clique aqui" para o Google Maps
+    if (ci) {
+      const px = 25, py = y + 43.6;
+      doc.setFillColor(...RED);
+      doc.triangle(px - 1.5, py + 0.9, px + 1.5, py + 0.9, px, py + 4.2, 'F');
+      doc.circle(px, py, 2, 'F');
+      doc.setFillColor(255, 255, 255).circle(px, py, 0.8, 'F');
+      const txt = 'Clique aqui para abrir a localização no Google Maps';
+      doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(...RED);
+      const tw = doc.getTextWidth(txt);
+      doc.textWithLink(txt, 30, y + 46, { url: MAPS_CI });
+      doc.setDrawColor(...RED).setLineWidth(0.3).line(30, y + 47.2, 30 + tw, y + 47.2);
+      doc.link(22, y + 40, 8 + tw, 9, { url: MAPS_CI });
+    }
+
     doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(109, 112, 118)
-      .text('Chegue com antecedência e apresente esta confirmação no atendimento.', 14, y + 54);
+      .text('Chegue com antecedência e apresente esta confirmação no atendimento.', 14, y + 54 + ex);
 
-    // Orientações importantes
-    const para1 = doc.splitTextToSize('Não atendemos nenhum veículo sem a presença de um acompanhante responsável no local. Se for notada a ausência do cliente ou acompanhante, o serviço será paralisado imediatamente até que o responsável retorne.', 174);
-    const para2 = doc.splitTextToSize('Caso o retorno demore, passaremos para o próximo veículo agendado. O veículo que ficou sem acompanhante só será atendido novamente se houver tempo disponível no final do expediente.', 174);
-    const bullets = [
-      'Chegar no horário programado e comunicar eventuais atrasos.',
-      'Veículo limpo internamente.',
-      'Condutor aguardar o término do serviço, visto que o local possui rotatividade de veículos.',
-      'Em caso de instalação: o veículo não pode ter outro sistema de telemetria/rastreador.'
-    ].map(b => doc.splitTextToSize(b, 168));
-    const obsLines = doc.splitTextToSize('Obs.: o local não permite a entrada com trajes inadequados (calção, bermuda, camiseta, chinelo, sandália).', 174);
+    // Orientações para atendimento no CI
+    const LH = 4.6, W = 182, PAD = 14;
+    const intro = doc.splitTextToSize('Para que o atendimento seja realizado de forma organizada e sem atrasos, pedimos que sejam observadas as seguintes orientações:', W);
+    const ITENS = [
+      ['Horário:', 'compareça no horário previamente programado. Caso ocorra algum imprevisto ou atraso, é importante comunicar antecipadamente. O tempo de tolerância para atraso é de 10 minutos.'],
+      ['Condições do veículo:', 'o veículo deve estar limpo internamente, facilitando a realização do serviço e proporcionando melhores condições para o atendimento.'],
+      ['Acompanhamento do serviço:', 'o condutor deverá permanecer no local e aguardar o término do atendimento, pois pode ser necessário realizar alguma verificação ou procedimento adicional no veículo.'],
+      ['Instalação de equipamentos:', 'nos casos de instalação, o veículo não poderá possuir outro sistema de telemetria ou rastreador instalado. Essa condição é necessária para evitar interferências ou conflitos entre os sistemas.'],
+      ['Vestimenta:', 'por se tratar de um local com normas específicas de acesso e segurança, não é permitida a entrada utilizando calção, bermuda, camiseta, chinelo ou sandália. É necessário comparecer utilizando vestimenta adequada para o ambiente.']
+    ];
+    const fecho = doc.splitTextToSize('O cumprimento dessas orientações ajuda a evitar atrasos, impedimentos de acesso e a necessidade de reagendamento do atendimento.', W);
 
-    let estH = 8 + para1.length * 4.6 + 3 + para2.length * 4.6 + 4;
-    bullets.forEach(bl => estH += bl.length * 4.6 + 1.2);
-    estH += 3 + obsLines.length * 4.6;
-
-    const pageH = doc.internal.pageSize.getHeight();
-    let yO = y + 54 + 10;
-    if (yO + estH > pageH - 16) { doc.addPage(); yO = 20; }
-
-    doc.setFont('helvetica', 'bold').setFontSize(11.5).setTextColor(...RED).text('Orientações importantes', 14, yO);
-    yO += 7;
-    doc.setFont('helvetica', 'normal').setFontSize(9.3).setTextColor(...INK);
-    doc.text(para1, 14, yO);
-    yO += para1.length * 4.6 + 3;
-    doc.text(para2, 14, yO);
-    yO += para2.length * 4.6 + 5;
-
-    bullets.forEach(bl => {
-      doc.setFillColor(...RED).circle(16, yO - 1.3, 0.9, 'F');
-      doc.text(bl, 20, yO);
-      yO += bl.length * 4.6 + 1.2;
+    // quebra o texto de cada item deixando o rótulo (negrito) na 1ª linha
+    doc.setFontSize(9.3);
+    const itens = ITENS.map(([rot, txt]) => {
+      doc.setFont('helvetica', 'bold');
+      const rw = doc.getTextWidth(rot + ' ');
+      doc.setFont('helvetica', 'normal');
+      const linhas = []; let atual = '', disp = W - 6 - rw;
+      txt.split(' ').forEach(w => {
+        const t = atual ? atual + ' ' + w : w;
+        if (doc.getTextWidth(t) > disp && atual) { linhas.push(atual); atual = w; disp = W - 6; } else atual = t;
+      });
+      if (atual) linhas.push(atual);
+      return { rot, rw, linhas };
     });
 
-    yO += 3;
-    doc.setFont('helvetica', 'italic').setFontSize(8.8).setTextColor(109, 112, 118);
-    doc.text(obsLines, 14, yO);
+    const pageH = doc.internal.pageSize.getHeight();
+    let estH = 8 + intro.length * LH + 3 + fecho.length * LH + 4;
+    itens.forEach(it => estH += it.linhas.length * LH + 1.8);
+    let yO = y + 54 + ex + 10;
+    if (yO + estH > pageH - 16) { doc.addPage(); yO = 20; }
 
+    doc.setFont('helvetica', 'bold').setFontSize(11.5).setTextColor(...RED).text('Orientações para atendimento no CI', PAD, yO);
+    yO += 7;
+    doc.setFont('helvetica', 'normal').setFontSize(9.3).setTextColor(...INK);
+    doc.text(intro, PAD, yO);
+    yO += intro.length * LH + 3;
+
+    itens.forEach(it => {
+      if (yO + it.linhas.length * LH > pageH - 16) { doc.addPage(); yO = 20; }
+      doc.setFillColor(...RED).circle(PAD + 2, yO - 1.3, 0.9, 'F');
+      doc.setFont('helvetica', 'bold').setTextColor(...INK).text(it.rot, PAD + 6, yO);
+      doc.setFont('helvetica', 'normal');
+      it.linhas.forEach((ln, i) => { doc.text(ln, PAD + 6 + (i === 0 ? it.rw : 0), yO); yO += LH; });
+      yO += 1.8;
+    });
+
+    yO += 2;
+    if (yO + fecho.length * LH > pageH - 16) { doc.addPage(); yO = 20; }
+    doc.setFont('helvetica', 'italic').setFontSize(8.8).setTextColor(109, 112, 118);
+    doc.text(fecho, PAD, yO);
   }
 
   rodape(doc);
-  doc.save(a.placa + ' ' + fmt(a.data).replace(/\//g, '-') + '.pdf'); // barra não vale em nome de arquivo
+  salvarPdf(doc, a.placa + ' ' + fmt(a.data).replace(/\//g, '-') + '.pdf'); // barra não vale em nome de arquivo
 }
 
 function gerarPdfTecnico(periodo, itens) {
@@ -134,5 +179,5 @@ function gerarPdfTecnico(periodo, itens) {
   rodape(doc);
   const d = iso => fmt(iso).replace(/\//g, '-'); // barra não vale em nome de arquivo
   const nomeArq = ini === '0000-00-00' ? 'AGENDA' : umDia ? 'AGENDA ' + d(ini) : 'AGENDA ' + d(ini) + ' a ' + d(fim);
-  doc.save(nomeArq + '.pdf');
+  salvarPdf(doc, nomeArq + '.pdf');
 }
