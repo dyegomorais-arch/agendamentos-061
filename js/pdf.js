@@ -166,16 +166,60 @@ function gerarPdfTecnico(periodo, itens) {
   const { ini, fim, rotulo } = periodo;
   const umDia = ini === fim;
   const doc = new jspdf.jsPDF({ orientation: 'landscape' });
+  const w = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
   const sub = umDia ? fmt(ini) + ' · ' + semana(ini) : rotulo.charAt(0).toUpperCase() + rotulo.slice(1);
   cabecalho(doc, 'Agenda de serviço', sub);
-  doc.autoTable({
-    startY: 48, theme: 'grid', styles: { fontSize: 10, cellPadding: 3.2, lineColor: [226, 228, 232] },
-    headStyles: { fillColor: INK, textColor: 255 }, alternateRowStyles: { fillColor: SOFT },
-    head: [['Data', 'Horário', 'Serviço', 'Placa', 'Tag', 'Veículo', 'Empresa', 'Local', 'Agendado por']],
-    body: itens.map(a => [fmt(a.data), horarioPdf(a), a.servico + (a.descricao ? ' - ' + a.descricao : ''), a.placa, a.tag || '-', a.veiculo, a.empresa, a.local, a.criadoPor || '-']),
-    columnStyles: { 0: { fontStyle: 'bold' }, 1: { fontStyle: 'bold', textColor: RED } },
-    margin: { bottom: 16 }
+
+  // resumo geral: total e quantos em cada local
+  const porLocal = agruparPorLocal(itens);
+  const resumo = plural(itens.length, 'agendamento', 'agendamentos') + '   ·   ' +
+    porLocal.map(g => siglaLocal(g.local) + ': ' + g.itens.length).join('   ·   ');
+  doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(...INK).text(resumo, 14, 48);
+
+  // dias em ordem; dentro de cada dia, um bloco por local; dentro do bloco, por horário
+  const dias = {};
+  itens.forEach(a => (dias[a.data] = dias[a.data] || []).push(a));
+  let y = 53;
+  const ESPACO_MIN = 34; // não deixa um título de bloco "sozinho" no fim da página
+
+  Object.keys(dias).sort().forEach(data => {
+    if (!umDia) {
+      if (y + ESPACO_MIN > pageH - 16) { doc.addPage(); y = 14; }
+      doc.setFillColor(...INK).rect(14, y, w - 28, 8, 'F');
+      doc.setFillColor(...RED).rect(14, y, 3, 8, 'F');
+      doc.setFont('helvetica', 'bold').setFontSize(10.5).setTextColor(255)
+        .text(fmt(data) + '  ·  ' + semana(data).toUpperCase(), 21, y + 5.6);
+      y += 11;
+    }
+    agruparPorLocal(dias[data]).forEach(({ local, itens: lista }) => {
+      if (y + ESPACO_MIN > pageH - 16) { doc.addPage(); y = 14; }
+      const salobo = normLocal(local) === 'salobo';
+      const cor = salobo ? RED : INK;
+      const corpo = [];
+      lista.forEach((a, i) => {
+        // linha de almoço entre o turno da manhã e o da tarde
+        if (i > 0 && horaInt(lista[i - 1].horario) < 12 && horaInt(a.horario) >= 13)
+          corpo.push([{ content: 'Almoço · 12h00 às 13h00', colSpan: 7, styles: { halign: 'center', fontStyle: 'italic', fontSize: 8, textColor: [109, 112, 118], fillColor: [255, 255, 255], cellPadding: 1.4 } }]);
+        corpo.push([horarioPdf(a), a.servico + (a.descricao ? ' - ' + a.descricao : ''), a.placa, a.tag || '-', a.veiculo, a.empresa, a.criadoPor || '-']);
+      });
+      doc.autoTable({
+        startY: y, theme: 'grid', showHead: 'everyPage',
+        styles: { fontSize: 10, cellPadding: 2.8, lineColor: [226, 228, 232], textColor: INK },
+        alternateRowStyles: { fillColor: SOFT },
+        head: [
+          [{ content: local.toUpperCase() + '   ·   ' + plural(lista.length, 'serviço', 'serviços'),
+             colSpan: 7, styles: { fillColor: cor, textColor: 255, fontSize: 10.5, halign: 'left' } }],
+          ['Horário', 'Serviço', 'Placa', 'Tag', 'Veículo', 'Empresa', 'Agendado por'].map(t => ({ content: t, styles: { fillColor: [226, 228, 232], textColor: INK, fontSize: 9 } }))
+        ],
+        body: corpo,
+        columnStyles: { 0: { fontStyle: 'bold', textColor: RED, cellWidth: 24 }, 1: { cellWidth: 62 }, 2: { fontStyle: 'bold', cellWidth: 28 }, 3: { cellWidth: 24 }, 4: { cellWidth: 38 }, 5: { cellWidth: 55 }, 6: { cellWidth: 38 } }, // larguras fixas: os blocos C.I e Salobo ficam alinhados
+        margin: { top: 14, bottom: 16, left: 14, right: 14 }
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    });
+    y += 2;
   });
+
   rodape(doc);
   const d = iso => fmt(iso).replace(/\//g, '-'); // barra não vale em nome de arquivo
   const nomeArq = ini === '0000-00-00' ? 'AGENDA' : umDia ? 'AGENDA ' + d(ini) : 'AGENDA ' + d(ini) + ' a ' + d(fim);

@@ -25,3 +25,25 @@ function horariosDoServico(servico, local) {
 }
 // ex.: "08:00 às 10:00"
 const faixaHorario = a => horaDe(horaInt(a.horario)) + ' às ' + horaDe(horaInt(a.horario) + duracaoServico(a.servico));
+
+// ---------- agrupamento por local (usado na agenda e no PDF do técnico) ----------
+const ORDEM_LOCAIS = ['Atendimento C.I', 'Salobo'];
+const normLocal = l => String(l || '').trim().toLowerCase();
+// nome curto para resumos: "Atendimento C.I" -> "C.I"
+const siglaLocal = l => normLocal(l) === 'atendimento c.i' ? 'C.I' : (l || 'Sem local');
+// recebe uma lista de agendamentos e devolve [{ local, itens }] com C.I primeiro, Salobo depois,
+// e os itens de cada local em ordem de horário
+function agruparPorLocal(lista) {
+  const m = new Map();
+  lista.forEach(a => {
+    const k = ORDEM_LOCAIS.find(l => normLocal(l) === normLocal(a.local)) || a.local || 'Sem local';
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(a);
+  });
+  const pos = k => { const i = ORDEM_LOCAIS.indexOf(k); return i < 0 ? 99 : i; };
+  return [...m.entries()].sort((a, b) => pos(a[0]) - pos(b[0])).map(([local, itens]) => ({
+    local,
+    itens: itens.sort((x, y) => String(x.horario).localeCompare(String(y.horario)) || String(x.placa).localeCompare(String(y.placa)))
+  }));
+}
+const plural = (n, s, p) => n + ' ' + (n === 1 ? s : p);

@@ -186,3 +186,17 @@ body:has(#login:not(.hide)){background:#111214}
 .voltar:focus-visible{outline:3px solid #ff7a84;outline-offset:3px}
 @media(max-width:480px){.voltar{top:14px;left:12px;padding:8px 13px 8px 10px;font-size:.76rem}}
 @media(prefers-reduced-motion:reduce){.voltar{animation:none;opacity:1}}
+
+/* ---- agenda separada por local (C.I / Salobo) ---- */
+.day h3{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.day h3 small{font-weight:600;font-size:.72rem;color:#c9cbd0;background:rgba(255,255,255,.12);padding:3px 10px;border-radius:20px}
+.loc{margin:0 0 16px;padding-left:12px;border-left:4px solid var(--ink)}
+.loc.sal{border-left-color:var(--red)}
+.loc .lh{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;margin:0 0 10px;padding:8px 12px;border-radius:10px;background:#fff;border:1.5px solid var(--line)}
+.loc .lh b{font-size:.92rem}
+.loc .lh span{font-size:.75rem;color:var(--gray)}
+.loc .lh em{margin-left:auto;font-style:normal;font-size:.72rem;font-weight:700;color:#fff;background:var(--ink);padding:2px 10px;border-radius:20px}
+.loc.sal .lh em{background:var(--red)}
+.almoco{text-align:center;font-size:.72rem;font-weight:600;color:var(--gray);letter-spacing:.06em;margin:2px 0 10px;display:flex;align-items:center;gap:10px}
+.almoco::before,.almoco::after{content:'';flex:1;border-top:1.5px dashed var(--line)}
+@media(max-width:560px){.loc{padding-left:8px}.loc .lh em{margin-left:0}}

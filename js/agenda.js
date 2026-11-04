@@ -234,12 +234,12 @@ function periodo() {
 
 const classeStatus = s => s === 'Concluído' ? 'ok' : s === 'Confirmado' ? 'cf' : s === 'Cancelado' ? 'ca' : '';
 
-function card(a, i, acoes = true, anima = true) {
+function card(a, i, acoes = true, anima = true, naLista = false) {
   const ex = excessoDe(a, mapaOcupacao(load())) > 0;
   const animStyle = anima ? `animation-delay:${i * 60}ms` : 'animation:none';
   return `<div class="ag ${ex ? 'conf' : ''} ${a.status === 'Concluído' ? 'done' : ''} ${abertos.has(a.id) ? 'open' : ''}" style="${animStyle}" data-open="${a.id}">
  <div class="hr">${a.horario}<small>${horaDe(horaInt(a.horario) + duracaoServico(a.servico))}</small></div>
- <div class="m"><b>${esc(a.placa)}</b> · ${esc(a.servico)}${ex ? ' <span class="warn" title="Este horário tem mais de um serviço no mesmo local. Reagende um deles.">⚠ acima do limite</span>' : ''}<div>${esc(a.empresa)} · ${esc(a.veiculo)} · ${esc(a.local)} · ${br(a.data)}</div></div>
+ <div class="m"><b>${esc(a.placa)}</b> · ${esc(a.servico)}${ex ? ' <span class="warn" title="Este horário tem mais de um serviço no mesmo local. Reagende um deles.">⚠ acima do limite</span>' : ''}<div>${esc(a.empresa)} · ${esc(a.veiculo)}${naLista ? (a.tag ? ' · Tag ' + esc(a.tag) : '') : ' · ' + esc(a.local) + ' · ' + br(a.data)}</div></div>
  ${acoes ? `<div><button class="ico" title="Concluir / reabrir" data-ok="${a.id}">✅</button><button class="ico" title="Editar" data-edit="${a.id}">✏️</button><button class="ico" title="PDF de confirmação" data-pdf="${a.id}">📄</button><button class="ico" title="Excluir" data-del="${a.id}">🗑️</button></div>` : '<div></div>'}
  <div class="det"><p><span class="badge ${classeStatus(a.status)}">${esc(a.status)}</span><span class="badge ${a.alta === 'SEM ALTA' ? 'sa' : 'al'}">${esc(a.alta || '-')}</span></p>
  <p>Tag: ${esc(a.tag || '-')} · Procurar por: ${esc(a.contato)}</p><p>Endereço: ${esc(a.endereco)}</p>${a.descricao ? `<p>Obs.: ${esc(a.descricao)}</p>` : ''}
@@ -255,8 +255,23 @@ function render(anima = false) {
   if ($('modal').classList.contains('on')) horarios(); // vagas atualizam em tempo real com o modal aberto
   if (!dd.length) { $('lista').innerHTML = '<p class="empty">Nenhum agendamento neste período.</p>'; return; }
   const g = {}; dd.forEach(a => (g[a.data] = g[a.data] || []).push(a));
-  $('lista').innerHTML = Object.entries(g).map(([d, it]) =>
-    `<div class="day"><h3>AGENDA DE SERVIÇO - ${br(d)} · ${diaSem(d)}</h3>${it.map((a, i) => card(a, i, true, anima)).join('')}</div>`).join('');
+  $('lista').innerHTML = Object.entries(g).map(([d, it]) => {
+    const grupos = agruparPorLocal(it);
+    const resumoDia = grupos.map(x => `${esc(siglaLocal(x.local))}: ${x.itens.length}`).join(' · ');
+    return `<div class="day"><h3><span>AGENDA DE SERVIÇO - ${br(d)} · ${diaSem(d)}</span><small>${resumoDia}</small></h3>${grupos.map(gr => blocoLocal(gr, anima)).join('')}</div>`;
+  }).join('');
+}
+
+// bloco de um local dentro do dia: cabeçalho (local, expediente, quantidade) + serviços em ordem de horário
+function blocoLocal({ local, itens }, anima) {
+  const salobo = normLocal(local) === 'salobo';
+  let html = '', ant = null;
+  itens.forEach((a, i) => {
+    // marca o intervalo de almoço entre o turno da manhã e o da tarde
+    if (ant && horaInt(ant.horario) < 12 && horaInt(a.horario) >= 13) html += '<div class="almoco">🍽 Almoço · 12:00 às 13:00</div>';
+    html += card(a, i, true, anima, true); ant = a;
+  });
+  return `<section class="loc ${salobo ? 'sal' : 'ci'}"><div class="lh"><b>📍 ${esc(local)}</b><em>${plural(itens.length, 'serviço', 'serviços')}</em></div>${html}</section>`;
 }
 $('tabs').onclick = e => {
   if (!e.target.dataset.v) return;
