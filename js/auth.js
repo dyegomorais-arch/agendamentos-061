@@ -20,6 +20,7 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
   try {
     await sessaoEncerrada;
     await signInWithEmailAndPassword(auth, u, p);
+    try { sessionStorage.removeItem('aviso-homologacao-visto'); } catch (e) {}
     location.href = 'agenda.html';
   } catch (err) {
     console.error(err);
