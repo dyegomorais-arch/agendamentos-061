@@ -9,9 +9,9 @@ function salvarPdf(doc, nome) {
   setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 1500);
 }
 
-const RED = [176, 30, 40], INK = [38, 40, 44], SOFT = [242, 243, 245];
-// Localização da Sillion C.I no Google Maps (link aparece no PDF só quando o local é Atendimento C.I)
-const MAPS_CI = 'https://www.google.com/maps/place/SILLION+C.I+Paraupebas+I/@-6.0966629,-49.8717792,17z/data=!3m1!4b1!4m6!3m5!1s0x92dd51000621b71d:0x3d96dd61011ce8a0!8m2!3d-6.0966682!4d-49.8691989!16s%2Fg%2F11x162yjyl';
+const RED = [224, 103, 79], RED_D = [194, 74, 51], BLUE = [79, 111, 174], INK = [43, 48, 64], SOFT = [246, 247, 251];
+// Localização do C.I no Google Maps (link aparece no PDF só quando o local é Atendimento C.I)
+const MAPS_CI = 'https://www.google.com/maps/search/?api=1&query=-6.0966682,-49.8691989';
 const ehCI = l => String(l || '').trim().toLowerCase() === 'atendimento c.i';
 // horário do agendamento no PDF: só o início, pontual (ex.: 10h00)
 const horarioPdf = a => String(horaInt(a.horario)).padStart(2, '0') + 'h00';
@@ -23,15 +23,15 @@ function cabecalho(doc, titulo, sub) {
   doc.addImage(window.LOGO_CLARO, 'PNG', 14, 8, 28, 28);
   doc.setTextColor(...INK).setFont('helvetica', 'bold').setFontSize(18).text(titulo, w - 14, 20, { align: 'right' });
   doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(109, 112, 118).text(sub, w - 14, 27, { align: 'right' });
-  doc.setFont('helvetica', 'bold').setFontSize(12).setTextColor(...RED).text('OS 061', 48, 24, { charSpace: 0.6 });
+  doc.setFont('helvetica', 'bold').setFontSize(12).setTextColor(...RED_D).text('OS 061', 48, 24, { charSpace: 0.6 });
   doc.setFillColor(...RED).rect(0, 38, w, 3, 'F');
 }
 
 function iconeSuporte(doc, cx, cy) {
-  doc.setDrawColor(255, 255, 255).setFillColor(255, 255, 255).setLineWidth(0.35);
+  doc.setDrawColor(...RED).setFillColor(...RED).setLineWidth(0.35);
   doc.roundedRect(cx - 3.2, cy - 2.3, 6.4, 4.3, 1, 1, 'FD');
   doc.triangle(cx - 1.8, cy + 1.9, cx - 0.6, cy + 1.9, cx - 1.8, cy + 3.3, 'F');
-  doc.setFillColor(...RED);
+  doc.setFillColor(255, 255, 255);
   doc.circle(cx - 1.4, cy - 0.15, 0.55, 'F');
   doc.circle(cx, cy - 0.15, 0.55, 'F');
   doc.circle(cx + 1.4, cy - 0.15, 0.55, 'F');
@@ -42,9 +42,10 @@ function rodape(doc) {
   for (let i = 1; i <= paginas; i++) {
     doc.setPage(i);
     const w = doc.internal.pageSize.getWidth(), h = doc.internal.pageSize.getHeight();
-    doc.setFillColor(...INK).rect(0, h - 12, w, 12, 'F');
-    doc.setFontSize(8).setTextColor(255);
-    doc.text('Sillion · Agenda de serviço · Emitido em ' + new Date().toLocaleString('pt-BR'), 14, h - 5);
+    doc.setFillColor(...SOFT).rect(0, h - 12, w, 12, 'F');
+    doc.setFillColor(...RED).rect(0, h - 12, w, 0.8, 'F');
+    doc.setFontSize(8).setTextColor(...INK);
+    doc.text('Programação de agendamento · OS 061 · Emitido em ' + new Date().toLocaleString('pt-BR'), 14, h - 5);
     const label = 'Suporte: Dyego Morais';
     const textX = w - 14;
     const tw = doc.getTextWidth(label);
@@ -60,7 +61,7 @@ function gerarPdfConfirmacao(a) {
   doc.setFont('helvetica', 'bold').setFontSize(12).setTextColor(...INK).text('Dados do agendamento', 14, 54);
   doc.autoTable({
     startY: 58, theme: 'grid', styles: { fontSize: 10, cellPadding: 3.5, lineColor: [226, 228, 232] },
-    headStyles: { fillColor: RED, textColor: 255 }, alternateRowStyles: { fillColor: SOFT },
+    headStyles: { fillColor: RED_D, textColor: 255 }, alternateRowStyles: { fillColor: SOFT },
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55, fillColor: SOFT } },
     head: [['Campo', 'Informação']],
     body: [
@@ -137,7 +138,7 @@ function gerarPdfConfirmacao(a) {
     let yO = y + 54 + ex + 10;
     if (yO + estH > pageH - 16) { doc.addPage(); yO = 20; }
 
-    doc.setFont('helvetica', 'bold').setFontSize(11.5).setTextColor(...RED).text('Orientações para atendimento no CI', PAD, yO);
+    doc.setFont('helvetica', 'bold').setFontSize(11.5).setTextColor(...RED_D).text('Orientações para atendimento no CI', PAD, yO);
     yO += 7;
     doc.setFont('helvetica', 'normal').setFontSize(9.3).setTextColor(...INK);
     doc.text(intro, PAD, yO);
@@ -168,7 +169,7 @@ function gerarPdfTecnico(periodo, itens) {
   const doc = new jspdf.jsPDF({ orientation: 'landscape' });
   const w = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
   const sub = umDia ? fmt(ini) + ' · ' + semana(ini) : rotulo.charAt(0).toUpperCase() + rotulo.slice(1);
-  cabecalho(doc, 'Agenda de serviço', sub);
+  cabecalho(doc, 'Programação de agendamento', sub);
 
   // resumo geral: total e quantos em cada local
   const porLocal = agruparPorLocal(itens);
@@ -185,7 +186,7 @@ function gerarPdfTecnico(periodo, itens) {
   Object.keys(dias).sort().forEach(data => {
     if (!umDia) {
       if (y + ESPACO_MIN > pageH - 16) { doc.addPage(); y = 14; }
-      doc.setFillColor(...INK).rect(14, y, w - 28, 8, 'F');
+      doc.setFillColor(...BLUE).rect(14, y, w - 28, 8, 'F');
       doc.setFillColor(...RED).rect(14, y, 3, 8, 'F');
       doc.setFont('helvetica', 'bold').setFontSize(10.5).setTextColor(255)
         .text(fmt(data) + '  ·  ' + semana(data).toUpperCase(), 21, y + 5.6);
@@ -194,7 +195,7 @@ function gerarPdfTecnico(periodo, itens) {
     agruparPorLocal(dias[data]).forEach(({ local, itens: lista }) => {
       if (y + ESPACO_MIN > pageH - 16) { doc.addPage(); y = 14; }
       const salobo = normLocal(local) === 'salobo';
-      const cor = salobo ? RED : INK;
+      const cor = salobo ? RED_D : BLUE;
       const corpo = [];
       lista.forEach((a, i) => {
         // linha de almoço entre o turno da manhã e o da tarde
@@ -209,10 +210,10 @@ function gerarPdfTecnico(periodo, itens) {
         head: [
           [{ content: local.toUpperCase() + '   ·   ' + plural(lista.length, 'serviço', 'serviços'),
              colSpan: 7, styles: { fillColor: cor, textColor: 255, fontSize: 10.5, halign: 'left' } }],
-          ['Horário', 'Serviço', 'Placa', 'Tag', 'Veículo', 'Empresa', 'Agendado por'].map(t => ({ content: t, styles: { fillColor: [226, 228, 232], textColor: INK, fontSize: 9 } }))
+          ['Horário', 'Serviço', 'Placa', 'Tag', 'Veículo', 'Empresa', 'Agendado por'].map(t => ({ content: t, styles: { fillColor: [232, 238, 248], textColor: INK, fontSize: 9 } }))
         ],
         body: corpo,
-        columnStyles: { 0: { fontStyle: 'bold', textColor: RED, cellWidth: 24 }, 1: { cellWidth: 62 }, 2: { fontStyle: 'bold', cellWidth: 28 }, 3: { cellWidth: 24 }, 4: { cellWidth: 38 }, 5: { cellWidth: 55 }, 6: { cellWidth: 38 } }, // larguras fixas: os blocos C.I e Salobo ficam alinhados
+        columnStyles: { 0: { fontStyle: 'bold', textColor: RED_D, cellWidth: 24 }, 1: { cellWidth: 62 }, 2: { fontStyle: 'bold', cellWidth: 28 }, 3: { cellWidth: 24 }, 4: { cellWidth: 38 }, 5: { cellWidth: 55 }, 6: { cellWidth: 38 } }, // larguras fixas: os blocos C.I e Salobo ficam alinhados
         margin: { top: 14, bottom: 16, left: 14, right: 14 }
       });
       y = doc.lastAutoTable.finalY + 8;

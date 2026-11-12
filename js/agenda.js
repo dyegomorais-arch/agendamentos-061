@@ -258,7 +258,7 @@ function render(anima = false) {
   $('lista').innerHTML = Object.entries(g).map(([d, it]) => {
     const grupos = agruparPorLocal(it);
     const resumoDia = grupos.map(x => `${esc(siglaLocal(x.local))}: ${x.itens.length}`).join(' · ');
-    return `<div class="day"><h3><span>AGENDA DE SERVIÇO - ${br(d)} · ${diaSem(d)}</span><small>${resumoDia}</small></h3>${grupos.map(gr => blocoLocal(gr, anima)).join('')}</div>`;
+    return `<div class="day"><h3><span>PROGRAMAÇÃO DE AGENDAMENTO - ${br(d)} · ${diaSem(d)}</span><small>${resumoDia}</small></h3>${grupos.map(gr => blocoLocal(gr, anima)).join('')}</div>`;
   }).join('');
 }
 
