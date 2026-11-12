@@ -241,20 +241,31 @@ body:has(#login:not(.hide)){background:#fff}
 .almoco::before,.almoco::after{content:'';flex:1;border-top:1.5px dashed var(--line)}
 @media(max-width:560px){.loc{padding-left:8px}.loc .lh em{margin-left:0}}
 
-/* ===== LOGIN SIMPLES: branco/cinza + um único acento (coral) ===== */
-body:has(#login:not(.hide)){background:#f4f5f7}
-#login{background:#f4f5f7}
-#login::before{height:4px;background:var(--red)}
-#login::after{opacity:.4;background-image:linear-gradient(rgba(43,48,64,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(43,48,64,.04) 1px,transparent 1px)}
-.bgfoto{filter:grayscale(1) contrast(1.05) brightness(1.05)}
-.bgov{background:rgba(255,255,255,.88)}
+/* ===== LOGIN PADRÃO 061/516: tema escuro grafite + acento coral suave ===== */
+:root{--lg-bg:#12161c;--lg-card:#20262f;--lg-line:#343e4d;--lg-input:#171c24;--lg-txt:#e6e9ef;--lg-mut:#a9b2c1;--lg-acc:#E58C76;--lg-btn:#C95B44;--lg-btn-d:#B84E39}
+body:has(#login:not(.hide)){background:var(--lg-bg)}
+#login{background:var(--lg-bg);color-scheme:dark}
+#login::before{height:4px;background:linear-gradient(90deg,var(--lg-btn),var(--lg-acc))}
+#login::after{opacity:.5;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px)}
+.bgfoto{filter:grayscale(.55) contrast(1.05) brightness(.85)}
+.bgov{background:linear-gradient(160deg,rgba(18,22,28,.80),rgba(26,32,41,.88))}
 .poeira,.arc{display:none}
-#loginForm.card{background:#fff;border:1px solid var(--line);box-shadow:0 20px 56px rgba(43,48,64,.14),0 2px 6px rgba(43,48,64,.05)}
-#loginForm.card::before{background:var(--red)}
-#loginForm.card img{box-shadow:0 8px 22px rgba(43,48,64,.14),0 0 0 5px #fff;border-color:var(--line)}
-#loginForm .os-badge{background:var(--red);box-shadow:none}
-#loginForm h1{color:var(--gray);letter-spacing:.1em;font-weight:600}
-#loginForm input:focus{border-color:var(--red);box-shadow:0 0 0 4px rgba(224,103,79,.15)}
-.voltar{color:var(--ink);background:rgba(255,255,255,.92);border-color:var(--line);box-shadow:none}
-.voltar:hover,.voltar:focus-visible{background:#fff;border-color:var(--red);box-shadow:0 6px 16px rgba(43,48,64,.12)}
-.voltar:focus-visible{outline-color:var(--red)}
+#loginForm.card{background:var(--lg-card);border:1px solid var(--lg-line);box-shadow:0 24px 60px rgba(0,0,0,.5),0 2px 8px rgba(0,0,0,.3)}
+#loginForm.card::before{background:linear-gradient(90deg,var(--lg-btn),var(--lg-acc))}
+#loginForm.card::after{color:#7f8aa0}
+#loginForm.card img{background:#fff;border-color:var(--lg-line);box-shadow:0 8px 22px rgba(0,0,0,.4),0 0 0 5px var(--lg-card)}
+#loginForm .os-badge{background:var(--lg-btn);color:#fff;box-shadow:0 4px 14px rgba(201,91,68,.3)}
+#loginForm h1{color:var(--lg-mut);letter-spacing:.12em;font-weight:600}
+#loginForm label{color:var(--lg-mut)}
+#loginForm input{background:var(--lg-input);border-color:var(--lg-line);color:var(--lg-txt)}
+#loginForm input:focus{background:#1b212a;border-color:var(--lg-acc);box-shadow:0 0 0 4px rgba(229,140,118,.18)}
+#loginForm input:-webkit-autofill{-webkit-text-fill-color:var(--lg-txt);box-shadow:0 0 0 40px var(--lg-input) inset;caret-color:var(--lg-txt)}
+#loginForm .eye{color:var(--lg-mut)}
+#loginForm .eye:hover{background:rgba(255,255,255,.07);color:var(--lg-acc)}
+#loginForm .err{color:#ff9f8b}
+#loginForm .btn{background:var(--lg-btn);color:#fff;box-shadow:0 6px 16px rgba(201,91,68,.28)}
+#loginForm .btn:hover{background:var(--lg-btn-d);box-shadow:0 8px 20px rgba(201,91,68,.36)}
+#loginForm .btn:focus-visible{outline:3px solid rgba(229,140,118,.5);outline-offset:2px}
+.voltar{color:var(--lg-txt);background:rgba(32,38,47,.85);border-color:var(--lg-line);box-shadow:none}
+.voltar:hover,.voltar:focus-visible{background:var(--lg-card);border-color:var(--lg-acc);box-shadow:0 6px 16px rgba(0,0,0,.35)}
+.voltar:focus-visible{outline-color:var(--lg-acc)}
